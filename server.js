@@ -203,7 +203,10 @@ app.use('/api/evidence', require('./src/backend/modules/evidence'));
 app.use('/api/review', require('./src/backend/modules/review'));
 app.use('/api/audit', require('./src/backend/modules/audit'));
 app.use('/api/v1', require('./src/backend/modules/phase4_routes'));
-app.use('/api/audit', require('./src/backend/modules/audit'));
+app.use('/api/v1', require('./src/backend/modules/phase5_routes'));
+app.use('/api/v1', require('./src/backend/modules/phase6_routes'));
+app.use('/api/v1', require('./src/backend/modules/phase7_routes'));
+app.use('/api/v1', require('./src/backend/modules/phase8_routes'));
 app.use('/api/interop', require('./src/backend/modules/interop'));
 app.use('/api/alerts', require('./src/backend/modules/alerts'));
 

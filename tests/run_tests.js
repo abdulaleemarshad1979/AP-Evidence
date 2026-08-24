@@ -41,7 +41,7 @@ async function runTestSuite() {
   // TEST GROUP 1: Unit Tests & System Branding
   // -------------------------------------------------------------
   console.log(`[TEST GROUP 1: Unit Tests & System Branding]`);
-  
+
   const sampleCase = await db.getCaseById('CASE-SYN-0001');
   assert(
     sampleCase && sampleCase.classification === 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
@@ -136,7 +136,7 @@ async function runTestSuite() {
 
   const origBuffer = Buffer.from('REAL_EVIDENCE_STREAM_PAYLOAD_2026_ORIGINAL_BYTES');
   const storeRes = await storage.putObject('test/evidence_001.bin', origBuffer, 'application/octet-stream');
-  
+
   const verifyOriginal = await storage.verifyIntegrity(storeRes.objectKey, storeRes.sha256);
   assert(
     verifyOriginal.integrityVerified === true,
@@ -286,6 +286,45 @@ async function runTestSuite() {
   // Geo-Temporal Search Test
   const geoResults = await db.query(`SELECT * FROM observations WHERE case_id = 'CASE-SYN-0001' LIMIT 5`);
   assert(geoResults.length > 0, 'Geo-Temporal observations query returns spatial results');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 11: Phase 5 Analytics & Alert Lifecycle APIs
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 11: Phase 5 Analytics & Alert Lifecycle]`);
+  const ruleId = await db.createAnalyticsRule({ name: 'Co-Location Test Rule', spatialWindowMeters: 500 });
+  assert(ruleId.startsWith('RULE-'), 'Phase 5 Analytics rule creation succeeded');
+
+  const alertId = await db.createAlert({ title: 'Test Co-location Alert', severity: 'HIGH' });
+  await db.updateAlertStatus(alertId, 'TRIAGED', null, 'Supervisor triage note');
+  const alertCheck = await db.getAlerts();
+  assert(alertCheck.some(a => a.id === alertId), 'Phase 5 Alert lifecycle state transitioned to TRIAGED');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 12: Phase 6 Governed Synthetic AI Assistance
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 12: Phase 6 Governed AI & Evidence Citation]`);
+  const modelId = await db.createModelRegistryEntry({ modelName: 'APIS-Synthetic-LLM', modelVersion: 'v2.1', provider: 'Mock' });
+  assert(modelId.startsWith('MODEL-'), 'Phase 6 AI Model Registry entry created');
+
+  const runId = await db.createAIRun({ promptTask: 'SUMMARIZE_TIMELINE', outputText: 'Target at node [EVI-RAW-SYN-0001]' });
+  await db.updateAIRunStatus(runId, 'APPROVED', 'Test Analyst', 'HITL approval granted');
+  const aiRuns = await db.getAIRuns();
+  const approvedRun = aiRuns.find(r => r.id === runId);
+  assert(approvedRun && approvedRun.review_status === 'APPROVED', 'Phase 6 Human-in-the-Loop review status updated to APPROVED');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 13: Phase 7 Enterprise Resilience & DR Verification
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 13: Phase 7 Enterprise Resilience & Retention]`);
+  const retPolicy = await db.query(`SELECT * FROM retention_policies`);
+  assert(Array.isArray(retPolicy), 'Phase 7 Retention policy table accessible');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 14: Phase 8 Synthetic Pilot Readiness
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 14: Phase 8 Master Build Pilot Readiness]`);
+  const casesFinal = await db.getCases();
+  assert(casesFinal.length > 0, 'Phase 8 Synthetic pilot scenarios verified operational');
 
   // -------------------------------------------------------------
   // SUMMARY

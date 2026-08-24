@@ -27,14 +27,17 @@ jobs:
           --health-retries 5
 
       minio:
-        image: minio/minio:latest
+        image: minio/minio:RELEASE.2024-01-29T20-56-42Z
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
         ports:
           - 9000:9000
         options: >-
-          server /data
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout Codebase

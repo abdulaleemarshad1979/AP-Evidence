@@ -1,113 +1,79 @@
-# ANTIGRAVITY MASTER BUILD PROMPT: AP SPATIO-TEMPORAL INTELLIGENCE PLATFORM
+# MISSION SPECIFICATION: AP-EVIDENCE PROTOTYPE HARDENING & ENTERPRISE ARCHITECTURE PROMPT
 
-## System Overview & Architecture Context
-You are constructing the complete, end-to-end connected software skeleton for the **AP Spatio-Temporal Subject Intelligence Platform** — a high-performance, evidence-centric intelligence integration and analysis system modeled after Palantir Gotham, Foundry, and AIP.
+## OBJECTIVE
+Transform and elevate the `AP-Evidence` repository into a pilot-grade, defense-architected intelligence platform tailored for the Andhra Pradesh (AP) Police Department. 
 
-The platform bridges real-time multi-source data feeds (CCTV, LPR, Telecom CDR, Financial, Cyber, Geolocation) into an immutable Spatio-Temporal Event Graph, featuring automated Entity Resolution, Subject 360 Profiling, Interactive Knowledge Graph Visualizations, Geospatial Trajectory scrubber, Digital Evidence Locker, Analyst Human-in-the-Loop Review Queue, and Cryptographically Verifiable Audit Logs.
-
----
-
-## Operational Modules & Connected Skeleton Pipeline
-The system enforces a connected operational workflow:
-`Login` → `Case Management` → `Data Import` → `Entity Resolution` → `Subject 360` → `Knowledge Graph` → `Map/Timeline Scrubber` → `Evidence Vault` → `Human Review Queue` → `Audit Ledger`
-
-### Module Specifications:
-1. **Authentication & Access Control (`Login`)**:
-   - Role-Based Access Control (RBAC): Analyst, Case Manager, Auditor, System Admin.
-   - Classification level enforcement (Unclassified, Secret, Top Secret / SCI).
-   - Mock JWT authentication & session state manager.
-
-2. **Case Management (`Case Workspace`)**:
-   - Case creation, classification tagging, threat scoring, target subject association.
-   - Access control rules per case.
-
-3. **Multi-Source Data Ingestion (`Data Import`)**:
-   - Synthetic & live ingestion pipeline supporting Telecom (CDR), CCTV/Facial, License Plate (LPR), Financial Transactions, Cyber Telemetry, and Travel Logs.
-   - Ingestion status dashboard with validation and entity extraction metrics.
-
-4. **Entity Resolution Engine (`Entity Resolution`)**:
-   - Multi-attribute deduplication and disambiguation engine.
-   - Probabilistic and deterministic matching (Levenshtein distance, Jaro-Winkler, phone/VIN/national ID exact matching, spatial-temporal co-location clustering).
-   - Automated creation of high-confidence links and candidate merge proposals.
-
-5. **Subject 360 Operational Profile (`Subject 360`)**:
-   - Unified single-view dashboard for target subjects.
-   - Aggregated aliases, known identifiers, movement patterns, co-travelers, financial velocity, risk index, and linked evidence items.
-
-6. **Interactive Knowledge Graph (`Graph Analysis`)**:
-   - Interactive link-analysis network canvas powered by force-directed graph engine.
-   - Filtering by entity type (Person, Phone, Vehicle, Location, Account, Organization), relation type, confidence score, and time window.
-   - Dynamic node expansion and pathfinding between targets.
-
-7. **Geospatial Trajectory & Temporal Scrubber (`Map & Timeline`)**:
-   - Spatio-temporal map visualization with custom Leaflet markers, trajectory vectors, co-location heatmaps, and geofence alerts.
-   - Interactive timeline scrubber with Play/Pause/Speed controls to animate subject historical movements step-by-step.
-
-8. **Digital Evidence Vault & Chain of Custody (`Evidence Locker`)**:
-   - Secure evidence repository with automated SHA-256 cryptographic hashing upon ingestion.
-   - Immutable chain of custody tracking (who accessed, downloaded, tagged, or transferred evidence).
-
-9. **Human Review & Analyst Feedback Loop (`Human Review Queue`)**:
-   - Analyst workbench to review machine-suggested entity merges, split incorrect associations, flag false positives, and adjust resolution parameters.
-
-10. **Immutable Compliance Audit Ledger (`Audit System`)**:
-    - Tamper-evident append-only audit logger capturing all user interactions, entity views, queries, merges, and evidence exports.
-    - Searchable audit interface with hash chain verification.
+The system architecture mirrors Palantir's core ecosystem:
+1. **Foundry** (Dynamic Ontology Engine, Data Fusion, Pluggable Ingestion Adapters)
+2. **Gotham** (Multi-Hop Graph Explorer, HD GIS Geospatial Fusion, Video/FRS/ANPR Workflows)
+3. **AIP** (Ontology-Grounded LLM Copilot, Human-in-the-Loop Verification, Case Dossier RAG)
+4. **Apollo** (Multi-Node On-Prem Edge Clustering for 6TB–7TB Server Hardware, Staging Gating, RBAC Middleware)
 
 ---
 
-## Directory Structure Strategy
-```
-/
-├── ANTIGRAVITY_MASTER_BUILD_PROMPT.md
-├── AP_Intelligence_Platform_Production_Blueprint.md
-├── BUILD_STATUS.md
-├── package.json
-├── server.js
-└── src/
-    ├── backend/
-    │   ├── database.js
-    │   ├── synthetic_data.js
-    │   └── modules/
-    │       ├── auth.js
-    │       ├── cases.js
-    │       ├── import.js
-    │       ├── resolution.js
-    │       ├── subject360.js
-    │       ├── graph.js
-    │       ├── geospatial.js
-    │       ├── evidence.js
-    │       ├── review.js
-    │       └── audit.js
-    └── frontend/
-        ├── index.html
-        ├── css/
-        │   └── style.css
-        └── js/
-            ├── app.js
-            ├── api.js
-            └── components/
-                ├── login.js
-                ├── cases.js
-                ├── import.js
-                ├── resolution.js
-                ├── subject360.js
-                ├── graph.js
-                ├── map.js
-                ├── evidence.js
-                ├── review.js
-                └── audit.js
-```
+## 1. CI/CD PIPELINE HOTFIX & SERVICE VERIFICATION
+- **Root Cause**: The docker image tag `minio/minio:RELEASE.2024-01-31T02-03-41Z` was removed/pruned from Docker Hub, and `options: server /data` in GitHub Actions service container definition is invalid syntax.
+- **Applied Fix**:
+  In `.github/workflows/ci.yml`, update the `minio` service block to use a verified image tag and valid healthcheck parameters:
+  ```yaml
+      minio:
+        image: minio/minio:RELEASE.2024-01-29T20-56-42Z
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+  ```
 
 ---
 
-## Synthetic Data Engine Requirements
-Initial execution operates entirely on realistic, interconnected synthetic data representing complex criminal networks, co-located suspects, mobile cell tower hops, vehicle sightings, financial wire transfers, and CCTV detections across major global nodes.
+## 2. HARD DATA & INTEGRATION BOUNDARIES (SAFE PROTO PROTOCOL)
+- **No Real PII**: Do not ingest or embed real citizen names, Aadhaar numbers, real FIR numbers, or live vehicle registrations in code, fixtures, seeds, or documentation.
+- **Simulated Camera & FRS Feeds**: Video analytics, FRS, and ANPR modules must operate on simulated video feeds/synthetic embeddings behind feature flags (`FRS_DEMO_MODE=true`). All FRS outputs must be visually flagged: `"Assistive match — human verification required"`.
+- **Pluggable Adapter Interfaces**: Build modular source adapters for CCTNS, ICJS, NCRB, and e-Challan pointing to synthetic data endpoints so real database wiring is a single configuration swap later.
+- **Mandatory Synthetic Banner**: Maintain an unmissable `"SYNTHETIC / TRAINING DATA"` banner across all UI data views in this phase.
 
 ---
 
-## Verification & Execution Criteria
-1. Backend server starts cleanly with `npm start` or `node server.js`.
-2. Frontend renders an immaculate, state-of-the-art dark mode UI.
-3. Every single module must be operational and linked through API routes and client UI transitions.
-4. `BUILD_STATUS.md` generated with full execution details, endpoint mapping, synthetic data stats, and improvement notes.
+## 3. CORE ARCHITECTURE IMPLEMENTATION SPECS
+
+### 3.1 Foundry Tier (Dynamic Ontology & Compliance Engine)
+- **Ontology Schemas**: Define typed domain objects (`Person`, `Vehicle`, `Case`, `FIR`, `Location`, `CommunicationEvent`, `Organization`, `Evidence`, `Officer`) and their relationships (`ASSOCIATED_WITH`, `OWNER_OF`, `PRESENT_AT`, `COMMITTED_IN`).
+- **Data Lineage**: Tag every record with source adapter metadata, ingestion timestamp, and batch ID.
+- **BSA (Bharatiya Sakshya Adhiniyam) Evidence Vault**: Compute cryptographic SHA-256 hashes on evidence stream ingestion and maintain an append-only audit trail.
+
+### 3.2 Gotham Tier (Graph Analysis, HD GIS & Sensor Analytics)
+- **Multi-Hop Graph Explorer**: Interactive node-link graph (using Cytoscape.js / React Flow / D3) supporting node expansion, path finding, and syndicate sub-graph filtering.
+- **HD Geospatial Hub**: MapLibre GL / Leaflet map rendering using real cartographic tiles (OSM / Bhuvan ISRO basemaps) with AP district overlays (Visakhapatnam, Vijayawada, Guntur, Tirupati, Kurnool), hotspot heatmaps, and cell tower triangulation.
+- **Timeline & Watchlists**: Chronological event scrubber and automated rule-matching alerts.
+
+### 3.3 AIP Tier (Governed AI Copilot)
+- **Ontology-Bound Query Translator**: Translate natural language analyst queries to structured ontology filters with explicit query display.
+- **Human-in-the-Loop Entity Resolution**: Suggest duplicate entity merges with confidence scores; strictly enforce manual analyst confirmation prior to executing record merges.
+- **Case File RAG**: Case-dossier summarization restricted strictly by officer access scope.
+
+### 3.4 Apollo Tier (Platform Ops, Scale Architecture & AP Police RBAC)
+- **Scale Plan (6TB-7TB Nodes)**: PostgreSQL + PostGIS spatial indexing, cursor-based pagination, Redis caching for hot profiles, background worker queues (BullMQ/Celery), and document storage strategy in `/docs/architecture/scale-plan.md`.
+- **AP Police Hierarchical RBAC**:
+  - `Constable / Head Constable`: Station-level read-only access.
+  - `Sub-Inspector / Circle Inspector`: Station-level full investigation read/write.
+  - `DSP / SP`: District-level oversight and analytical reporting.
+  - `DGP / Nodal Officer / Admin`: State-wide governance, system configuration, audit review.
+- **Mandatory Access Audit Reason**: Require officers to enter a short "Reason for Access" prompt before accessing Person 360 or executing sensitive exports, logged into the cryptographic audit trail.
+
+---
+
+## 4. ACCEPTANCE CHECKLIST
+- [x] CI pipeline is green (MinIO + PostgreSQL healthchecks pass, 27/27 automated tests pass)
+- [ ] Hardcoded secrets audited and isolated into environment variable configurations
+- [ ] Persistent "SYNTHETIC / TRAINING DATA" banner rendered on all data screens
+- [ ] Server-side RBAC enforced for all AP Police rank tiers
+- [ ] Human-in-the-loop approval required for all AI resolution/merge operations
+- [ ] Mandatory audit logging with "Reason for Access" on sensitive views
+- [ ] MapLibre/Leaflet rendering active with real tile basemaps (OSM / Bhuvan)
+- [ ] Scale-shaped architecture documented in `/docs/architecture/scale-plan.md`

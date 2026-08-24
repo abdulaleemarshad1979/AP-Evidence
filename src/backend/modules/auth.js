@@ -42,6 +42,14 @@ router.post('/login', async (req, res) => {
   const token = signJwtToken(user);
   await db.logAudit(user.id, user.name, 'USER_LOGIN', 'Auth', `Successful OIDC JWT login for user ${user.username} (${user.role})`);
 
+  // Set secure HttpOnly session cookie
+  res.cookie('apis_session', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 8 * 3600 * 1000
+  });
+
   return res.json({
     token,
     tokenType: 'Bearer',
@@ -57,6 +65,15 @@ router.post('/login', async (req, res) => {
       classification: 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE'
     }
   });
+});
+
+// Logout route clearing session cookies
+router.post('/logout', authenticateMiddleware, async (req, res) => {
+  if (req.user) {
+    await db.logAudit(req.user.id, req.user.name, 'USER_LOGOUT', 'Auth', `User ${req.user.username} logged out.`);
+  }
+  res.clearCookie('apis_session');
+  res.json({ message: 'Logged out successfully' });
 });
 
 // Current user profile route

@@ -5,6 +5,26 @@ const JWT_SECRET = process.env.JWT_SECRET || 'AP_INTELLIGENCE_PLATFORM_SECURE_JW
 const JWT_ISSUER = process.env.JWT_ISSUER || 'https://keycloak.internal/realms/ap-intelligence';
 const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'ap-evidence-app';
 
+// Safety check for production mode
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes('YOUR_SECURE'))) {
+  console.warn('[SECURITY ALERT] Production mode requires a custom strong JWT_SECRET environment variable!');
+}
+
+/**
+ * Helper to parse cookies from raw Header string
+ */
+function parseCookies(req) {
+  const list = {};
+  const rc = req.headers.cookie;
+  if (rc) {
+    rc.split(';').forEach(cookie => {
+      const parts = cookie.split('=');
+      list[parts.shift().trim()] = decodeURI(parts.join('='));
+    });
+  }
+  return list;
+}
+
 /**
  * Sign a JWT token with full claim set
  */
@@ -45,15 +65,18 @@ function verifyJwtToken(token) {
 
 /**
  * Extract and verify authenticated user context from request
- * STRICT ENFORCEMENT: No synthetic token strings, no X-User-Id header, no USR-101 fallback.
+ * Supports Authorization header or HttpOnly apis_session cookie
  */
 async function getContextUser(req) {
+  let token = null;
   const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7).trim();
+  } else {
+    const cookies = parseCookies(req);
+    token = cookies['apis_session'] || null;
   }
 
-  const token = authHeader.substring(7).trim();
   if (!token) return null;
 
   const decoded = verifyJwtToken(token);

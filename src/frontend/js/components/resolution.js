@@ -21,21 +21,26 @@ const ResolutionComponent = {
         const scorePct = Math.round(cand.matchScore * 100);
         const badgeClass = scorePct >= 85 ? 'badge-critical' : 'badge-high';
 
-        const reasonsList = cand.reasons.map(r => `• ${r.feature}: ${r.note}`).join('<br>');
+        const comparedStr = (cand.comparedFields || []).join(', ');
+        const conflictsStr = (cand.conflicts || []).map(c => `${c.field}: ${c.valA} vs ${c.valB}`).join('; ');
 
         tr.innerHTML = `
           <td class="mono" style="color: var(--accent-cyan); font-weight: 600;">${cand.id}</td>
           <td><strong>${cand.entityADetails ? cand.entityADetails.name : cand.entityA}</strong><br><small class="mono">${cand.entityA}</small></td>
           <td><strong>${cand.entityBDetails ? cand.entityBDetails.name : cand.entityB}</strong><br><small class="mono">${cand.entityB}</small></td>
           <td><span class="badge-status ${badgeClass}">${scorePct}% MATCH</span></td>
-          <td style="font-size: 0.8rem; color: var(--text-muted);">${reasonsList}</td>
-          <td><span class="badge-status ${cand.status === 'MERGED' ? 'badge-low' : 'badge-high'}">${cand.status}</span></td>
+          <td style="font-size: 0.8rem; color: var(--text-muted);">
+            Rule: <code>${cand.ruleVersion || 'v2.1'}</code><br>
+            Fields: [${comparedStr}]<br>
+            ${conflictsStr ? `<span style="color: var(--accent-crimson);">Conflicts: ${conflictsStr}</span>` : 'No conflicts'}
+          </td>
+          <td><span class="badge-status ${cand.status === 'APPROVED_MERGED' ? 'badge-low' : (cand.status === 'REVERSED' ? 'badge-high' : 'badge-critical')}">${cand.status}</span></td>
           <td>
             ${cand.status === 'PENDING_REVIEW' ? `
               <button class="btn btn-primary btn-sm btn-review-cand" data-id="${cand.id}">
-                <i class="fa-solid fa-code-compare"></i> Review Merge
+                <i class="fa-solid fa-code-compare"></i> Review
               </button>
-            ` : `<span style="color: var(--text-muted); font-size: 0.8rem;">Completed</span>`}
+            ` : `<span style="color: var(--text-muted); font-size: 0.8rem;">${cand.status}</span>`}
           </td>
         `;
         tableBody.appendChild(tr);
@@ -45,7 +50,7 @@ const ResolutionComponent = {
       if (badgeRes) badgeRes.innerText = pendingCount;
 
     } catch (err) {
-      tableBody.innerHTML = `<tr><td colspan="7">Failed to load resolution candidates.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="7">${err.message}</td></tr>`;
     }
   },
 
@@ -55,7 +60,7 @@ const ResolutionComponent = {
       scanBtn.addEventListener('click', async () => {
         try {
           const res = await API.post('/resolution/run-scan', {});
-          alert(`Scan Finished: Found ${res.newCandidatesCount} new candidate pairs.`);
+          alert(`Scan Finished: Generated ${res.newCandidatesCount} new resolution candidate pairs.`);
           await this.renderCandidatesTable();
           if (window.ReviewComponent) window.ReviewComponent.renderReviewCards();
           if (window.AuditComponent) window.AuditComponent.renderAuditTable();
@@ -68,7 +73,6 @@ const ResolutionComponent = {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('.btn-review-cand');
       if (btn) {
-        // Switch to Review Tab
         const tabBtn = document.querySelector('.nav-tab[data-tab="review"]');
         if (tabBtn) tabBtn.click();
       }

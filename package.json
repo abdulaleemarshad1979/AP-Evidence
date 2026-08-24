@@ -23,6 +23,9 @@
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^4.22.2"
+    "express": "^4.22.2",
+    "pg": "^8.23.0",
+    "pg-mem": "^3.0.14",
+    "sqlite3": "^6.0.1"
   }
 }

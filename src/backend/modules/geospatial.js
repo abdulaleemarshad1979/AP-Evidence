@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const { getContextUser, abacMiddleware } = require('../middleware/abac');
 
-// Get spatio-temporal event trajectory
-router.get('/trajectory', (req, res) => {
-  const { entityId, caseId, startTime, endTime } = req.query;
+// Get spatio-temporal event trajectory (ABAC Protected)
+router.get('/trajectory', abacMiddleware('READ', req => req.query.caseId || 'CASE-SYN-0001'), (req, res) => {
+  const user = req.user || getContextUser(req);
+  const { entityId, caseId } = req.query;
 
   let events = db.events;
 
@@ -12,13 +14,14 @@ router.get('/trajectory', (req, res) => {
     events = events.filter(ev => ev.associatedEntityIds && ev.associatedEntityIds.includes(entityId));
   }
 
-  // Sort events chronologically
+  if (caseId) {
+    events = events.filter(ev => ev.caseId === caseId);
+  }
+
   events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  // Locations / cameras
-  const locations = db.entities.filter(e => e.type === 'Location');
-
-  db.logAudit('USR-101', 'Dr. Sarah Vance', 'QUERY_GEOSPATIAL_TRAJECTORY', 'Geospatial Scrubber', `Queried spatio-temporal trajectory (Target: ${entityId || 'ALL'}, Events returned: ${events.length})`);
+  const locations = db.getEntities({ type: 'Location' });
+  db.logAudit(user.id, user.name, 'SEARCH', 'Geospatial Scrubber', `Queried spatio-temporal trajectory (Target: ${entityId || 'ALL'}, Case: ${caseId || 'ALL'})`, entityId, caseId);
 
   res.json({
     events,

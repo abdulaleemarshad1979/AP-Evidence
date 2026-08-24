@@ -1,355 +1,433 @@
-const db = require('./database');
 const crypto = require('crypto');
 
-function generateSyntheticData() {
-  console.log('[SYNTHETIC ENGINE] Generating multi-source intelligence dataset...');
+async function generateSyntheticData(db) {
+  console.log('[SYNTHETIC ENGINE] Initializing PostgreSQL database with synthetic intelligence dataset...');
 
-  // 1. Users
-  db.users = [
-    { id: 'USR-101', username: 'analyst_lead', name: 'Dr. Sarah Vance', role: 'Analyst', clearance: 'TOP_SECRET_SCI', department: 'Counter-Terrorism & Threat Intel' },
-    { id: 'USR-102', username: 'case_manager', name: 'Marcus Brody', role: 'Case Manager', clearance: 'TOP_SECRET', department: 'Special Operations Group' },
-    { id: 'USR-103', username: 'compliance_auditor', name: 'Elena Vance', role: 'Auditor', clearance: 'SECRET', department: 'IG Oversight & Audit' },
-    { id: 'USR-104', username: 'sys_admin', name: 'Root Operations', role: 'Admin', clearance: 'TOP_SECRET_SCI', department: 'Cyber & Platform Admin' }
+  // Ensure DB initialized
+  await db.init();
+
+  // Clean existing tables for clean seed
+  db.execute(`DELETE FROM users`);
+  db.execute(`DELETE FROM cases`);
+  db.execute(`DELETE FROM case_assignments`);
+  db.execute(`DELETE FROM entities`);
+  db.execute(`DELETE FROM observations`);
+  db.execute(`DELETE FROM assertions`);
+  db.execute(`DELETE FROM evidence_metadata`);
+  db.execute(`DELETE FROM evidence_custody_ledger`);
+  db.execute(`DELETE FROM ingestion_batches`);
+  db.execute(`DELETE FROM ingestion_rows`);
+  db.execute(`DELETE FROM resolution_candidates`);
+  db.execute(`DELETE FROM merge_history`);
+  db.execute(`DELETE FROM audit_events`);
+  db.execute(`DELETE FROM outbox_events`);
+
+  // 1. Users (ABAC Attributes)
+  const users = [
+    { id: 'USR-101', username: 'analyst_lead', name: 'Analyst Lead (Synthetic User)', role: 'Analyst', org: 'ORG-ALPHA', jur: 'JUR-UK', purpose: 'COUNTER_TERRORISM' },
+    { id: 'USR-102', username: 'case_manager', name: 'Case Manager (Synthetic User)', role: 'Case Manager', org: 'ORG-ALPHA', jur: 'JUR-UK', purpose: 'COUNTER_TERRORISM' },
+    { id: 'USR-103', username: 'compliance_auditor', name: 'Auditor (Synthetic User)', role: 'Auditor', org: 'ORG-ALPHA', jur: 'JUR-GLOBAL', purpose: 'AUDIT_OVERSIGHT' },
+    { id: 'USR-104', username: 'sys_admin', name: 'System Admin (Synthetic User)', role: 'Admin', org: 'ORG-ALPHA', jur: 'JUR-GLOBAL', purpose: 'SYSTEM_ADMIN' },
+    { id: 'USR-105', username: 'unassigned_analyst', name: 'Unassigned Analyst (Foreign Org/Jur)', role: 'Analyst', org: 'ORG-BETA', jur: 'JUR-US', purpose: 'CYBER_INTEL' }
   ];
 
-  // 2. Entities
-  db.entities = [
+  for (const u of users) {
+    db.execute(`
+      INSERT INTO users (id, username, name, role, organization, jurisdiction, purpose_clearance)
+      VALUES ('${u.id}', '${u.username}', '${u.name}', '${u.role}', '${u.org}', '${u.jur}', '${u.purpose}')
+    `);
+  }
+
+  // 2. Cases
+  const cases = [
     {
-      id: 'PER-88219',
-      type: 'Person',
-      name: 'Viktor Vance',
-      aliases: ['The Architect', 'Viktor V.'],
-      dob: '1981-04-12',
-      nationality: 'Dual (UK / CY)',
-      passportNo: 'GB-99201488',
-      primaryPhone: '+44-7700-900412',
-      phoneNumbers: ['+44-7700-900412', '+41-79-555-0192'],
-      riskScore: 94,
-      classification: 'TOP_SECRET_SCI',
-      primaryLocation: 'London, UK / Zurich, CH',
-      notes: 'High-value target associated with illicit cyber-financial transactions and cross-border logistics.'
+      id: 'CASE-SYN-0001',
+      title: 'Synthetic Case Alpha (Fictional Operation)',
+      codeName: 'CASE_SYN_ALPHA',
+      description: 'Fictional synthetic spatio-temporal intelligence scenario tracking synthetic test entities across London, Zurich, and Dubai nodes.',
+      organization: 'ORG-ALPHA',
+      jurisdiction: 'JUR-UK',
+      classification: 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
+      purposes: 'COUNTER_TERRORISM,TRAINING',
+      status: 'ACTIVE',
+      targetEntityIds: JSON.stringify(['SUB-00001', 'SUB-00002', 'SUB-00003', 'FIN-SYN-0001', 'VEH-SYN-0001'])
     },
     {
-      id: 'PER-88220',
+      id: 'CASE-SYN-0002',
+      title: 'Synthetic Case Beta (Fictional Operation)',
+      codeName: 'CASE_SYN_BETA',
+      description: 'Fictional synthetic network mapping scenario restricted to authorized regional personnel.',
+      organization: 'ORG-ALPHA',
+      jurisdiction: 'JUR-UK',
+      classification: 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
+      purposes: 'COUNTER_TERRORISM',
+      status: 'ACTIVE',
+      targetEntityIds: JSON.stringify(['SUB-00003', 'TEL-SYN-0001'])
+    }
+  ];
+
+  for (const c of cases) {
+    db.execute(`
+      INSERT INTO cases (id, title, code_name, description, organization, jurisdiction, classification_level, permitted_purposes, status, target_entity_ids)
+      VALUES ('${c.id}', '${c.title}', '${c.codeName}', '${c.description.replace(/'/g, "''")}', '${c.organization}', '${c.jurisdiction}', '${c.classification}', '${c.purposes}', '${c.status}', '${c.targetEntityIds}')
+    `);
+  }
+
+  // Case assignments
+  db.execute(`INSERT INTO case_assignments (case_id, user_id) VALUES ('CASE-SYN-0001', 'USR-101')`);
+  db.execute(`INSERT INTO case_assignments (case_id, user_id) VALUES ('CASE-SYN-0001', 'USR-102')`);
+  db.execute(`INSERT INTO case_assignments (case_id, user_id) VALUES ('CASE-SYN-0002', 'USR-101')`);
+
+  // 3. Fictional Synthetic Entities
+  const entities = [
+    {
+      id: 'SUB-00001',
       type: 'Person',
-      name: 'Elena Rostova',
-      aliases: ['Helen Rostov', 'E. Rostova'],
-      dob: '1987-09-24',
-      nationality: 'Estonia',
-      passportNo: 'EE-44910293',
-      primaryPhone: '+372-555-0149',
-      phoneNumbers: ['+372-555-0149', '+44-7700-900881'],
-      riskScore: 88,
-      classification: 'TOP_SECRET',
-      primaryLocation: 'Tallinn, EE / London, UK',
-      notes: 'Financial conduit and shell company controller linked to Viktor Vance.'
+      name: 'Synthetic Subject SYN-00001 (Fictional Person)',
+      aliases: JSON.stringify(['Synthetic Alias Alpha', 'Sub-001']),
+      identifierFields: JSON.stringify({ passportNo: 'SYN-GB-99201488', primaryPhone: '+44-7700-900412', nationality: 'Synthetic Country A' }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'DETERMINISTIC_EXACT_MATCH',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P1_HIGH',
+      isFictional: true,
+      metadata: JSON.stringify({ primaryLocation: 'Synthetic London Node', notes: 'Synthetic subject entity created for algorithm testing.' })
     },
     {
-      id: 'PER-88221',
+      id: 'SUB-00002',
       type: 'Person',
-      name: 'Tariq Al-Mansoor',
-      aliases: ['Abu Omar', 'Tariq M.'],
-      dob: '1979-11-03',
-      nationality: 'UAE',
-      passportNo: 'AE-77109283',
-      primaryPhone: '+971-50-123-4567',
-      phoneNumbers: ['+971-50-123-4567'],
-      riskScore: 91,
-      classification: 'TOP_SECRET',
-      primaryLocation: 'Dubai, UAE',
-      notes: 'Regional logistics broker and encrypted communications provider.'
+      name: 'Synthetic Subject SYN-00002 (Fictional Person)',
+      aliases: JSON.stringify(['Synthetic Alias Beta', 'Sub-002']),
+      identifierFields: JSON.stringify({ passportNo: 'SYN-EE-44910293', primaryPhone: '+372-555-0149', nationality: 'Synthetic Country B' }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'DETERMINISTIC_EXACT_MATCH',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P2_MEDIUM',
+      isFictional: true,
+      metadata: JSON.stringify({ primaryLocation: 'Synthetic Tallinn Node', notes: 'Synthetic financial associate entity.' })
     },
     {
-      id: 'PER-88222',
+      id: 'SUB-00003',
       type: 'Person',
-      name: 'V. Vance (Unverified Alias)',
-      aliases: ['V. Vance', 'Viktor V.'],
-      dob: '1981-04-12',
-      nationality: 'UK',
-      passportNo: 'GB-99201488',
-      primaryPhone: '+44-7700-900412',
-      phoneNumbers: ['+44-7700-900412'],
-      riskScore: 78,
-      classification: 'SECRET',
-      primaryLocation: 'London, UK',
-      notes: 'Automated entity extract from Heathrow LPR / Passport Scan.'
+      name: 'Synthetic Subject SYN-00003 (Fictional Person)',
+      aliases: JSON.stringify(['Synthetic Alias Gamma', 'Sub-003']),
+      identifierFields: JSON.stringify({ passportNo: 'SYN-AE-77109283', primaryPhone: '+971-50-123-4567', nationality: 'Synthetic Country C' }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'DETERMINISTIC_EXACT_MATCH',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P2_MEDIUM',
+      isFictional: true,
+      metadata: JSON.stringify({ primaryLocation: 'Synthetic Dubai Node', notes: 'Synthetic logistics associate entity.' })
     },
     {
-      id: 'VEH-901',
+      id: 'SUB-00004',
+      type: 'Person',
+      name: 'Synthetic Subject Candidate SYN-00004 (Unverified Candidate)',
+      aliases: JSON.stringify(['Synthetic Alias Candidate', 'Sub-004-Candidate']),
+      identifierFields: JSON.stringify({ passportNo: 'SYN-GB-99201488', primaryPhone: '+44-7700-900412', nationality: 'Synthetic Country A' }),
+      evidenceStatus: 'DERIVED_ANALYSIS',
+      assertionClass: 'ALGORITHMIC_CANDIDATE',
+      confidenceMethod: 'PROBABILISTIC_JARO_WINKLER',
+      humanReviewStatus: 'PENDING_REVIEW',
+      reviewPriority: 'P1_HIGH',
+      isFictional: true,
+      metadata: JSON.stringify({ primaryLocation: 'Synthetic Heathrow Node', notes: 'Automated entity resolution scan match candidate.' })
+    },
+    {
+      id: 'VEH-SYN-0001',
       type: 'Vehicle',
-      name: 'Black Armored SUV (Bentley Bentayga)',
-      licensePlate: 'KX71-FZX',
-      vin: 'SJAAC2ZY9MC019283',
-      make: 'Bentley',
-      model: 'Bentayga',
-      color: 'Obsidian Black',
-      registeredOwner: 'PER-88219',
-      riskScore: 82,
-      classification: 'SECRET'
+      name: 'Synthetic Vehicle VEH-SYN-0001 (Fictional Armored SUV)',
+      aliases: JSON.stringify(['Obsidian Black Bentayga']),
+      identifierFields: JSON.stringify({ licensePlate: 'SYN-KX71-FZX', vin: 'SYN-SJAAC2ZY9MC019283' }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'DETERMINISTIC_EXACT_MATCH',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P2_MEDIUM',
+      isFictional: true,
+      metadata: JSON.stringify({ registeredOwner: 'SUB-00001' })
     },
     {
-      id: 'VEH-902',
+      id: 'VEH-SYN-0002',
       type: 'Vehicle',
-      name: 'Silver Mercedes-AMG G63',
-      licensePlate: 'LX69-WYZ',
-      vin: 'W1N4632761X091823',
-      make: 'Mercedes-Benz',
-      model: 'G63 AMG',
-      color: 'Iridium Silver',
-      registeredOwner: 'PER-88220',
-      riskScore: 75,
-      classification: 'SECRET'
+      name: 'Synthetic Vehicle VEH-SYN-0002 (Fictional Silver SUV)',
+      aliases: JSON.stringify(['Iridium Silver G63']),
+      identifierFields: JSON.stringify({ licensePlate: 'SYN-LX69-WYZ', vin: 'SYN-W1N4632761X091823' }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'DETERMINISTIC_EXACT_MATCH',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P3_LOW',
+      isFictional: true,
+      metadata: JSON.stringify({ registeredOwner: 'SUB-00002' })
     },
     {
-      id: 'TEL-4412',
+      id: 'TEL-SYN-0001',
       type: 'Telecom',
-      name: 'Encrypted Bearer Line (+44-7700-900412)',
-      msisdn: '+44-7700-900412',
-      imsi: '234159012345678',
-      imei: '358910091234560',
-      carrier: 'GlobalSecure Mobile',
-      riskScore: 90,
-      classification: 'TOP_SECRET'
+      name: 'Synthetic Telecom Line TEL-SYN-0001 (Fictional Line)',
+      aliases: JSON.stringify(['Bearer Line 4412']),
+      identifierFields: JSON.stringify({ msisdn: '+44-7700-900412', imsi: '234159012345678', imei: '358910091234560' }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'DETERMINISTIC_EXACT_MATCH',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P2_MEDIUM',
+      isFictional: true,
+      metadata: JSON.stringify({ carrier: 'Synthetic Secure Telecom Provider' })
     },
     {
-      id: 'FIN-3391',
+      id: 'FIN-SYN-0001',
       type: 'FinancialAccount',
-      name: 'Zurich Offshore Private Banking #88192',
-      accountNumber: 'CH93-0024-8819-2091-8',
-      bankName: 'Helvetia Private Vault CH',
-      accountHolder: 'PER-88219',
-      riskScore: 95,
-      classification: 'TOP_SECRET_SCI'
+      name: 'Synthetic Account FIN-SYN-0001 (Fictional Bank Account)',
+      aliases: JSON.stringify(['Offshore Vault Account 88192']),
+      identifierFields: JSON.stringify({ accountNumber: 'SYN-CH93-0024-8819-2091-8', bankName: 'Synthetic Helvetia Bank' }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'DETERMINISTIC_EXACT_MATCH',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P1_HIGH',
+      isFictional: true,
+      metadata: JSON.stringify({ accountHolder: 'SUB-00001' })
     },
     {
-      id: 'LOC-501',
+      id: 'LOC-SYN-0001',
       type: 'Location',
-      name: 'Mayfair Safehouse Complex',
-      address: '14 Curzon Street, Mayfair, London W1J 5HN',
-      latitude: 51.5074,
-      longitude: -0.1478,
-      facilityType: 'Safehouse',
-      riskScore: 89,
-      classification: 'SECRET'
+      name: 'Synthetic Location LOC-SYN-0001 (London Complex)',
+      aliases: JSON.stringify(['London Curzon Node']),
+      identifierFields: JSON.stringify({ address: '14 Curzon Street, London, UK', latitude: 51.5074, longitude: -0.1478 }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'LEAFLET_GEO_TEMPORAL',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P2_MEDIUM',
+      isFictional: true,
+      metadata: JSON.stringify({ facilityType: 'Synthetic Safehouse Facility' })
     },
     {
-      id: 'LOC-502',
+      id: 'LOC-SYN-0002',
       type: 'Location',
-      name: 'Zurich Financial Hub Office',
-      address: 'Gotthardstrasse 26, 8002 Zürich, Switzerland',
-      latitude: 47.3667,
-      longitude: 8.5333,
-      facilityType: 'Corporate Office',
-      riskScore: 70,
-      classification: 'SECRET'
+      name: 'Synthetic Location LOC-SYN-0002 (Zurich Hub)',
+      aliases: JSON.stringify(['Zurich Gotthard Node']),
+      identifierFields: JSON.stringify({ address: 'Gotthardstrasse 26, Zürich, Switzerland', latitude: 47.3667, longitude: 8.5333 }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'LEAFLET_GEO_TEMPORAL',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P3_LOW',
+      isFictional: true,
+      metadata: JSON.stringify({ facilityType: 'Synthetic Office Facility' })
     },
     {
-      id: 'LOC-503',
+      id: 'LOC-SYN-0003',
       type: 'Location',
-      name: 'Dubai Marina Luxury Tower',
-      address: 'Marina Gate 1, Dubai Marina, UAE',
-      latitude: 25.0805,
-      longitude: 55.1403,
-      facilityType: 'Residence',
-      riskScore: 85,
-      classification: 'SECRET'
+      name: 'Synthetic Location LOC-SYN-0003 (Dubai Gate)',
+      aliases: JSON.stringify(['Dubai Marina Gate Node']),
+      identifierFields: JSON.stringify({ address: 'Marina Gate 1, Dubai, UAE', latitude: 25.0805, longitude: 55.1403 }),
+      evidenceStatus: 'VERIFIED_RAW',
+      assertionClass: 'CONFIRMED_FACT',
+      confidenceMethod: 'LEAFLET_GEO_TEMPORAL',
+      humanReviewStatus: 'UNREVIEWED',
+      reviewPriority: 'P2_MEDIUM',
+      isFictional: true,
+      metadata: JSON.stringify({ facilityType: 'Synthetic Residence Facility' })
     }
   ];
 
-  // 3. Cases
-  db.cases = [
-    {
-      id: 'CASE-2026-091',
-      title: 'Operation BLACKSTONE',
-      codeName: 'OPERATION_BLACKSTONE',
-      description: 'Cross-border spatio-temporal tracking of cyber-financial network operating across London, Zurich, and Dubai.',
-      classification: 'TOP_SECRET_SCI',
-      threatLevel: 'CRITICAL',
-      status: 'ACTIVE',
-      assignedAnalysts: ['Dr. Sarah Vance', 'Marcus Brody'],
-      targetEntityIds: ['PER-88219', 'PER-88220', 'PER-88221', 'FIN-3391', 'VEH-901'],
-      createdAt: '2026-08-01T08:00:00Z',
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: 'CASE-2026-044',
-      title: 'Operation CYBER_FOX',
-      codeName: 'OPERATION_CYBER_FOX',
-      description: 'Encrypted communications network mapping & cell tower hop trajectory analysis.',
-      classification: 'SECRET',
-      threatLevel: 'HIGH',
-      status: 'ACTIVE',
-      assignedAnalysts: ['Dr. Sarah Vance'],
-      targetEntityIds: ['PER-88221', 'TEL-4412'],
-      createdAt: '2026-07-15T10:30:00Z',
-      updatedAt: new Date().toISOString()
-    }
-  ];
+  for (const e of entities) {
+    db.execute(`
+      INSERT INTO entities (id, type, name, aliases, identifier_fields, evidence_status, assertion_class, confidence_method, human_review_status, review_priority, is_fictional, metadata)
+      VALUES ('${e.id}', '${e.type}', '${e.name}', '${e.aliases.replace(/'/g, "''")}', '${e.identifierFields.replace(/'/g, "''")}', '${e.evidenceStatus}', '${e.assertionClass}', '${e.confidenceMethod}', '${e.humanReviewStatus}', '${e.reviewPriority}', TRUE, '${e.metadata.replace(/'/g, "''")}')
+    `);
+  }
 
-  // 4. Relationships
-  db.relationships = [
-    { id: 'REL-101', source: 'PER-88219', target: 'PER-88220', type: 'CO_TRAVELER_ASSOCIATE', confidence: 0.96, evidenceRef: 'EVD-9001' },
-    { id: 'REL-102', source: 'PER-88219', target: 'PER-88221', type: 'ENCRYPTED_CALL_COMMUNICATION', confidence: 0.91, evidenceRef: 'EVD-9002' },
-    { id: 'REL-103', source: 'PER-88219', target: 'VEH-901', type: 'OWNS_OPERATES', confidence: 0.99, evidenceRef: 'EVD-9003' },
-    { id: 'REL-104', source: 'PER-88220', target: 'VEH-902', type: 'REGISTERED_OWNER', confidence: 0.98, evidenceRef: 'EVD-9004' },
-    { id: 'REL-105', source: 'PER-88219', target: 'FIN-3391', type: 'BENEFICIAL_OWNER', confidence: 0.97, evidenceRef: 'EVD-9005' },
-    { id: 'REL-106', source: 'PER-88219', target: 'LOC-501', type: 'FREQUENTS_SAFEHOUSE', confidence: 0.94, evidenceRef: 'EVD-9006' },
-    { id: 'REL-107', source: 'PER-88220', target: 'LOC-502', type: 'CORPORATE_DIRECTOR', confidence: 0.89, evidenceRef: 'EVD-9007' },
-    { id: 'REL-108', source: 'PER-88221', target: 'LOC-503', type: 'RESIDENCE_OCCUPANT', confidence: 0.95, evidenceRef: 'EVD-9008' }
-  ];
-
-  // 5. Spatio-Temporal Events
-  db.events = [
+  // 4. Observations (Spatio-Temporal Events)
+  const observations = [
     {
-      id: 'EVT-1001',
-      eventType: 'CCTV_DETECTION',
+      id: 'OBS-SYN-1001',
+      entityId: 'SUB-00001',
+      caseId: 'CASE-SYN-0001',
+      type: 'CCTV_DETECTION',
       timestamp: '2026-08-24T06:00:00Z',
-      locationName: 'Mayfair CCTV Pole 42 (Curzon St)',
-      latitude: 51.5074,
-      longitude: -0.1478,
+      locName: 'London Curzon CCTV Node 42',
+      lat: 51.5074,
+      lng: -0.1478,
       confidence: 0.96,
-      associatedEntityIds: ['PER-88219', 'VEH-901', 'LOC-501'],
-      description: 'Facial recognition match (96.4%) for Viktor Vance exiting Bentley Bentayga (KX71-FZX) at Mayfair Safehouse.',
-      evidenceRef: 'EVD-9001'
+      evidenceStatus: 'VERIFIED_RAW',
+      evidenceId: 'EVI-SYN-0001',
+      raw: JSON.stringify({ description: 'Facial recognition match (96.4%) for Synthetic Subject SUB-00001 exiting SUV VEH-SYN-0001.' })
     },
     {
-      id: 'EVT-1002',
-      eventType: 'CDR_CALL_HOP',
+      id: 'OBS-SYN-1002',
+      entityId: 'SUB-00001',
+      caseId: 'CASE-SYN-0001',
+      type: 'CDR_CALL_HOP',
       timestamp: '2026-08-24T06:15:00Z',
-      locationName: 'Cell Tower UK-LON-881 (Hyde Park North)',
-      latitude: 51.5085,
-      longitude: -0.1550,
+      locName: 'London Hyde Park Cell Tower UK-881',
+      lat: 51.5085,
+      lng: -0.1550,
       confidence: 0.92,
-      associatedEntityIds: ['PER-88219', 'PER-88221', 'TEL-4412'],
-      description: 'Encrypted call duration 412s initiated from +44-7700-900412 to Dubai node +971-50-123-4567.',
-      evidenceRef: 'EVD-9002'
+      evidenceStatus: 'VERIFIED_RAW',
+      evidenceId: 'EVI-SYN-0002',
+      raw: JSON.stringify({ description: 'Encrypted telemetry ping initiated from TEL-SYN-0001 to Dubai node +971-50-123-4567.' })
     },
     {
-      id: 'EVT-1003',
-      eventType: 'LPR_SIGHTING',
+      id: 'OBS-SYN-1003',
+      entityId: 'SUB-00002',
+      caseId: 'CASE-SYN-0001',
+      type: 'LPR_SIGHTING',
       timestamp: '2026-08-24T06:30:00Z',
-      locationName: 'Heathrow Airport Terminal 5 LPR Gate B',
-      latitude: 51.4700,
-      longitude: -0.4543,
+      locName: 'Heathrow Airport Terminal 5 LPR Gate B',
+      lat: 51.4700,
+      lng: -0.4543,
       confidence: 0.99,
-      associatedEntityIds: ['PER-88220', 'VEH-902'],
-      description: 'LPR scan logged Silver Mercedes AMG G63 (LX69-WYZ) entering VIP Private Jet Terminal.',
-      evidenceRef: 'EVD-9004'
+      evidenceStatus: 'VERIFIED_RAW',
+      evidenceId: 'EVI-SYN-0003',
+      raw: JSON.stringify({ description: 'LPR scan logged Synthetic Silver SUV VEH-SYN-0002 entering VIP Terminal.' })
     },
     {
-      id: 'EVT-1004',
-      eventType: 'BANK_TRANSACTION',
+      id: 'OBS-SYN-1004',
+      entityId: 'SUB-00001',
+      caseId: 'CASE-SYN-0001',
+      type: 'BANK_TRANSACTION',
       timestamp: '2026-08-24T06:45:00Z',
-      locationName: 'Zurich SWIFT Terminal #099',
-      latitude: 47.3667,
-      longitude: 8.5333,
+      locName: 'Zurich Financial Terminal #099',
+      lat: 47.3667,
+      lng: 8.5333,
       confidence: 1.0,
-      associatedEntityIds: ['PER-88219', 'FIN-3391', 'LOC-502'],
-      description: 'Wire transfer of €4,500,000 executed from CH93-0024-8819-2091-8 to Cayman Holding Entity.',
-      evidenceRef: 'EVD-9005'
+      evidenceStatus: 'VERIFIED_RAW',
+      evidenceId: 'EVI-SYN-0003',
+      raw: JSON.stringify({ description: 'Synthetic ledger wire transfer of €4,500,000 executed from FIN-SYN-0001.' })
     },
     {
-      id: 'EVT-1005',
-      eventType: 'CCTV_DETECTION',
+      id: 'OBS-SYN-1005',
+      entityId: 'SUB-00003',
+      caseId: 'CASE-SYN-0001',
+      type: 'CCTV_DETECTION',
       timestamp: '2026-08-24T07:10:00Z',
-      locationName: 'Dubai International Airport Private Helipad',
-      latitude: 25.2532,
-      longitude: 55.3657,
+      locName: 'Dubai Airport Private Helipad Node',
+      lat: 25.2532,
+      lng: 55.3657,
       confidence: 0.94,
-      associatedEntityIds: ['PER-88221', 'LOC-503'],
-      description: 'CCTV facial match for Tariq Al-Mansoor meeting arriving charter flight passenger.',
-      evidenceRef: 'EVD-9008'
+      evidenceStatus: 'VERIFIED_RAW',
+      evidenceId: 'EVI-SYN-0003',
+      raw: JSON.stringify({ description: 'CCTV facial match for Synthetic Subject SUB-00003 meeting passenger.' })
     }
   ];
 
-  // 6. Evidence Vault & Chain of Custody
-  const rawEv1 = "CCTV_FRAME_20260824_MAYFAIR_060000_VIKTOR_VANCE_RAW_CAPTURE";
-  const rawEv2 = "CDR_PCAP_STREAM_20260824_061500_CELL_LON881";
-  const rawEv3 = "SWIFT_WIRE_ACKNOWLEDGEMENT_ZURICH_88192_EUR_4500000";
+  for (const o of observations) {
+    db.execute(`
+      INSERT INTO observations (id, entity_id, case_id, observation_type, timestamp, location_name, latitude, longitude, confidence_score, evidence_status, raw_data, evidence_id)
+      VALUES ('${o.id}', '${o.entityId}', '${o.caseId}', '${o.type}', '${o.timestamp}', '${o.locName}', ${o.lat}, ${o.lng}, ${o.confidence}, '${o.evidenceStatus}', '${o.raw.replace(/'/g, "''")}', '${o.evidenceId}')
+    `);
+  }
 
-  db.evidence = [
+  // 5. Assertions (Relationships)
+  const assertions = [
+    { id: 'AST-SYN-101', sub: 'SUB-00001', obj: 'SUB-00002', caseId: 'CASE-SYN-0001', rel: 'CO_TRAVELER_ASSOCIATE', conf: 0.96, method: 'PROBABILISTIC_JARO_WINKLER', classType: 'CORRELATED', reviewStatus: 'UNREVIEWED', priority: 'P2_MEDIUM', ev: 'EVI-SYN-0001' },
+    { id: 'AST-SYN-102', sub: 'SUB-00001', obj: 'SUB-00003', caseId: 'CASE-SYN-0001', rel: 'ENCRYPTED_CALL_COMMUNICATION', conf: 0.91, method: 'DETERMINISTIC_EXACT_MATCH', classType: 'CONFIRMED_FACT', reviewStatus: 'UNREVIEWED', priority: 'P2_MEDIUM', ev: 'EVI-SYN-0002' },
+    { id: 'AST-SYN-103', sub: 'SUB-00001', obj: 'VEH-SYN-0001', caseId: 'CASE-SYN-0001', rel: 'OWNS_OPERATES', conf: 0.99, method: 'DETERMINISTIC_EXACT_MATCH', classType: 'CONFIRMED_FACT', reviewStatus: 'UNREVIEWED', priority: 'P2_MEDIUM', ev: 'EVI-SYN-0001' },
+    { id: 'AST-SYN-104', sub: 'SUB-00002', obj: 'VEH-SYN-0002', caseId: 'CASE-SYN-0001', rel: 'REGISTERED_OWNER', conf: 0.98, method: 'DETERMINISTIC_EXACT_MATCH', classType: 'CONFIRMED_FACT', reviewStatus: 'UNREVIEWED', priority: 'P3_LOW', ev: 'EVI-SYN-0003' },
+    { id: 'AST-SYN-105', sub: 'SUB-00001', obj: 'FIN-SYN-0001', caseId: 'CASE-SYN-0001', rel: 'BENEFICIAL_OWNER', conf: 0.97, method: 'DETERMINISTIC_EXACT_MATCH', classType: 'CONFIRMED_FACT', reviewStatus: 'UNREVIEWED', priority: 'P1_HIGH', ev: 'EVI-SYN-0003' },
+    { id: 'AST-SYN-106', sub: 'SUB-00001', obj: 'LOC-SYN-0001', caseId: 'CASE-SYN-0001', rel: 'FREQUENTS_SAFEHOUSE', conf: 0.94, method: 'LEAFLET_GEO_TEMPORAL', classType: 'CORRELATED', reviewStatus: 'UNREVIEWED', priority: 'P2_MEDIUM', ev: 'EVI-SYN-0001' }
+  ];
+
+  for (const a of assertions) {
+    db.execute(`
+      INSERT INTO assertions (id, subject_entity_id, object_entity_id, case_id, relation_type, confidence_score, confidence_method, assertion_class, human_review_status, review_priority, evidence_id)
+      VALUES ('${a.id}', '${a.sub}', '${a.obj}', '${a.caseId}', '${a.rel}', ${a.conf}, '${a.method}', '${a.classType}', '${a.reviewStatus}', '${a.priority}', '${a.ev}')
+    `);
+  }
+
+  // 6. Evidence Metadata & Custody Ledger
+  const rawPayload1 = "SYNTHETIC_CCTV_FRAME_20260824_MAYFAIR_060000_RAW_CAPTURE";
+  const rawPayload2 = "SYNTHETIC_CDR_PCAP_STREAM_20260824_061500_CELL_LON881";
+  const rawPayload3 = "SYNTHETIC_SWIFT_WIRE_ACKNOWLEDGEMENT_ZURICH_88192";
+
+  const sha1 = crypto.createHash('sha256').update(rawPayload1).digest('hex');
+  const sha2 = crypto.createHash('sha256').update(rawPayload2).digest('hex');
+  const sha3 = crypto.createHash('sha256').update(rawPayload3).digest('hex');
+
+  const evidenceItems = [
     {
-      id: 'EVD-9001',
-      title: 'CCTV High-Res Frame Capture #4819 (Mayfair)',
+      id: 'EVI-SYN-0001',
+      title: 'Synthetic CCTV Frame Capture #4819 (London Node)',
       mediaType: 'IMAGE_JPEG',
       fileSize: '4.2 MB',
-      sha256: crypto.createHash('sha256').update(rawEv1).digest('hex'),
-      classification: 'TOP_SECRET_SCI',
-      custodian: 'Dr. Sarah Vance',
-      sourceDevice: 'Met Police CCTV Cam #42',
-      associatedEntityIds: ['PER-88219', 'VEH-901', 'LOC-501'],
-      chainOfCustody: [
-        { timestamp: '2026-08-24T06:01:00Z', user: 'Automated Ingestion Pipeline', action: 'INGESTED_AND_HASHED', notes: 'SHA-256 integrity verified upon stream arrival.' },
-        { timestamp: '2026-08-24T06:05:00Z', user: 'Dr. Sarah Vance', action: 'ANALYST_VIEWED', notes: 'Verified facial match vector (96.4%). Tagged for Case BLACKSTONE.' }
-      ]
+      sha256: sha1,
+      isOriginal: true,
+      parentId: null,
+      custodian: 'Analyst Lead (Synthetic User)',
+      sourceDevice: 'Synthetic CCTV Cam #42',
+      caseId: 'CASE-SYN-0001',
+      status: 'VERIFIED_RAW',
+      meta: JSON.stringify({ associatedEntityIds: ['SUB-00001', 'VEH-SYN-0001', 'LOC-SYN-0001'] })
     },
     {
-      id: 'EVD-9002',
-      title: 'Telecom CDR Audio Packet Stream (UK-LON-881)',
+      id: 'EVI-SYN-0002',
+      title: 'Synthetic Telecom CDR Packet Stream (London Node)',
       mediaType: 'AUDIO_RAW_PCAP',
       fileSize: '18.7 MB',
-      sha256: crypto.createHash('sha256').update(rawEv2).digest('hex'),
-      classification: 'TOP_SECRET',
-      custodian: 'Marcus Brody',
-      sourceDevice: 'GCHQ Intercept Feed #882',
-      associatedEntityIds: ['PER-88219', 'PER-88221', 'TEL-4412'],
-      chainOfCustody: [
-        { timestamp: '2026-08-24T06:16:00Z', user: 'Automated Ingestion Pipeline', action: 'INGESTED_AND_HASHED', notes: 'Encrypted stream metadata parsed.' }
-      ]
+      sha256: sha2,
+      isOriginal: true,
+      parentId: null,
+      custodian: 'Case Manager (Synthetic User)',
+      sourceDevice: 'Synthetic Intercept Sensor #882',
+      caseId: 'CASE-SYN-0001',
+      status: 'VERIFIED_RAW',
+      meta: JSON.stringify({ associatedEntityIds: ['SUB-00001', 'SUB-00003', 'TEL-SYN-0001'] })
     },
     {
-      id: 'EVD-9005',
-      title: 'SWIFT Wire Receipt & Digital Signature Log',
+      id: 'EVI-SYN-0003',
+      title: 'Synthetic SWIFT Receipt Log & Derived Analysis',
       mediaType: 'PDF_DOCUMENT',
       fileSize: '840 KB',
-      sha256: crypto.createHash('sha256').update(rawEv3).digest('hex'),
-      classification: 'TOP_SECRET_SCI',
-      custodian: 'Dr. Sarah Vance',
-      sourceDevice: 'FINCEN SWIFT Monitor',
-      associatedEntityIds: ['PER-88219', 'FIN-3391'],
-      chainOfCustody: [
-        { timestamp: '2026-08-24T06:46:00Z', user: 'Dr. Sarah Vance', action: 'INGESTED_AND_HASHED', notes: 'Financial wire evidence logged into Case BLACKSTONE.' }
-      ]
+      sha256: sha3,
+      isOriginal: false,
+      parentId: 'EVI-SYN-0001',
+      custodian: 'Analyst Lead (Synthetic User)',
+      sourceDevice: 'Synthetic Financial Monitor',
+      caseId: 'CASE-SYN-0001',
+      status: 'DERIVED_ANALYSIS',
+      meta: JSON.stringify({ associatedEntityIds: ['SUB-00001', 'FIN-SYN-0001'] })
     }
   ];
 
-  // 7. Entity Resolution Candidates
-  db.resolutionCandidates = [
-    {
-      id: 'RES-301',
-      entityA: 'PER-88219',
-      entityB: 'PER-88222',
-      matchScore: 0.94,
-      status: 'PENDING_REVIEW',
-      reasons: [
-        { feature: 'Name Similarity (Jaro-Winkler)', score: 0.92, note: 'Viktor Vance vs V. Vance' },
-        { feature: 'Passport No Match', score: 1.0, note: 'Both share Passport GB-99201488' },
-        { feature: 'Primary Phone Match', score: 1.0, note: 'Both list +44-7700-900412' },
-        { feature: 'Spatio-Temporal Proximity', score: 0.95, note: 'Co-located at Heathrow T5 Terminal' }
-      ],
-      createdAt: '2026-08-24T06:35:00Z'
-    },
-    {
-      id: 'RES-302',
-      entityA: 'PER-88220',
-      entityB: 'PER-88219',
-      matchScore: 0.72,
-      status: 'PENDING_REVIEW',
-      reasons: [
-        { feature: 'Co-Traveler Correlation', score: 0.88, note: 'Shared 4 flights across Europe' },
-        { feature: 'Shared Vehicle Sightings', score: 0.79, note: 'Vehicles sighted together in Mayfair' },
-        { feature: 'Name Similarity', score: 0.25, note: 'Distinct names' }
-      ],
-      createdAt: '2026-08-24T06:40:00Z'
-    }
-  ];
+  for (const ev of evidenceItems) {
+    db.execute(`
+      INSERT INTO evidence_metadata (id, title, media_type, file_size, sha256, is_original, parent_evidence_id, classification, custodian, source_device, case_id, evidence_status, human_review_status, review_priority, metadata)
+      VALUES ('${ev.id}', '${ev.title.replace(/'/g, "''")}', '${ev.mediaType}', '${ev.fileSize}', '${ev.sha256}', ${ev.isOriginal ? 'TRUE' : 'FALSE'}, ${ev.parentId ? `'${ev.parentId}'` : 'NULL'}, 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE', '${ev.custodian.replace(/'/g, "''")}', '${ev.sourceDevice}', '${ev.caseId}', '${ev.status}', 'UNREVIEWED', 'P2_MEDIUM', '${ev.meta.replace(/'/g, "''")}')
+    `);
 
-  // 8. Audit Ledger Initial Entries
-  db.logAudit('USR-101', 'Dr. Sarah Vance', 'SYSTEM_INITIALIZATION', 'Platform', 'System booted with synthetic intelligence dataset.');
-  db.logAudit('USR-101', 'Dr. Sarah Vance', 'VIEW_SUBJECT_360', 'Subject 360', 'Accessed Subject 360 profile for PER-88219 (Viktor Vance)', 'PER-88219');
-  db.logAudit('USR-102', 'Marcus Brody', 'QUERY_KNOWLEDGE_GRAPH', 'Graph Engine', 'Executed dynamic link expansion for Case BLACKSTONE', 'CASE-2026-091');
+    // Custody ledger
+    const custHash = crypto.createHash('sha256').update(`${ev.id}:INGESTED_AND_HASHED:USR-101`).digest('hex');
+    db.execute(`
+      INSERT INTO evidence_custody_ledger (id, evidence_id, timestamp, user_id, username, action, notes, hash_signature)
+      VALUES ('CUST-${ev.id}-1', '${ev.id}', '2026-08-24T06:01:00Z', 'USR-101', 'Analyst Lead (Synthetic User)', 'INGESTED_AND_HASHED', 'SHA-256 integrity verified upon synthetic ingestion.', '${custHash}')
+    `);
+  }
 
-  console.log(`[SYNTHETIC ENGINE] Data loaded successfully: ${db.entities.length} Entities, ${db.events.length} Events, ${db.cases.length} Cases, ${db.evidence.length} Evidence Vault Records.`);
+  // 7. Candidate Resolution Workflows
+  const comparedFields = JSON.stringify(['name', 'primaryPhone', 'passportNo', 'dob']);
+  const individualScores = JSON.stringify({ name: 0.92, primaryPhone: 1.0, passportNo: 1.0, dob: 1.0 });
+  const conflicts = JSON.stringify([{ field: 'primaryLocation', valA: 'Synthetic London Node', valB: 'Synthetic Heathrow Node' }]);
+
+  db.execute(`
+    INSERT INTO resolution_candidates (id, entity_a, entity_b, rule_version, match_score, compared_fields, individual_scores, conflicts, human_review_status, review_priority, reviewer, decision_reason, status)
+    VALUES ('RES-SYN-301', 'SUB-00001', 'SUB-00004', 'v2.1-deterministic-probabilistic', 0.94, '${comparedFields.replace(/'/g, "''")}', '${individualScores.replace(/'/g, "''")}', '${conflicts.replace(/'/g, "''")}', 'PENDING_REVIEW', 'P1_HIGH', NULL, NULL, 'PENDING_REVIEW')
+  `);
+
+  // 8. Initial Audit Log Entries
+  db.logAudit('USR-101', 'Analyst Lead (Synthetic User)', 'SYSTEM_INITIALIZATION', 'Platform', 'System initialized with PostgreSQL synthetic dataset.', null, 'CASE-SYN-0001');
+  db.logAudit('USR-101', 'Analyst Lead (Synthetic User)', 'READ', 'Subject 360', 'Accessed Subject 360 profile for SUB-00001', 'SUB-00001', 'CASE-SYN-0001');
+  db.logAudit('USR-102', 'Case Manager (Synthetic User)', 'SEARCH', 'Graph Engine', 'Queried synthetic network graph', 'SUB-00001', 'CASE-SYN-0001');
+
+  // Emit initial Outbox event
+  db.emitOutboxEvent('SYSTEM', 'SYS-001', 'DATASET_SEEDED', { totalEntities: 11, totalCases: 2 });
+
+  console.log('[SYNTHETIC ENGINE] PostgreSQL Synthetic dataset seeded successfully.');
 }
 
 module.exports = { generateSyntheticData };

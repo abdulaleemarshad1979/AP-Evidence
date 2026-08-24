@@ -4,11 +4,18 @@ const path = require('path');
 const db = require('./src/backend/database');
 const seed = require('./src/backend/seed');
 
-// Initialize synthetic dataset
-seed();
-
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize PostgreSQL database & seed dataset
+(async () => {
+  try {
+    await db.init();
+    await seed();
+  } catch (err) {
+    console.error('Server DB initialization failed:', err);
+  }
+})();
 
 // Middleware
 app.use(cors());
@@ -34,9 +41,10 @@ app.use('/api/audit', require('./src/backend/modules/audit'));
 app.get('/api/system/status', (req, res) => {
   res.json({
     system: 'AP Spatio-Temporal Subject Intelligence Platform',
-    version: '1.0.0-ENTERPRISE-SKELETON',
-    status: 'OPERATIONAL',
-    classification: 'TOP_SECRET//SI-GAMMA/TK//NOFORN',
+    version: '1.0.0-FOUNDATION-PASS-1',
+    status: 'IMPLEMENTED',
+    classification: 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
+    databaseEngine: 'PostgreSQL (pg-mem with DDL migrations, persistent disk snapshot & outbox)',
     dataset: {
       entities: db.entities.length,
       cases: db.cases.length,
@@ -55,11 +63,15 @@ app.get('*', (req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`================================================================`);
-  console.log(` AP SPATIO-TEMPORAL INTELLIGENCE PLATFORM (Palantir Architecture)`);
-  console.log(` Running on: http://localhost:${PORT}`);
-  console.log(` Classification Level: TOP SECRET // SCI`);
-  console.log(` Synthetic Data Engine: ONLINE (${db.entities.length} entities loaded)`);
-  console.log(`================================================================`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`================================================================`);
+    console.log(` AP SPATIO-TEMPORAL INTELLIGENCE PLATFORM (Foundation Pass 1)`);
+    console.log(` Running on: http://localhost:${PORT}`);
+    console.log(` Classification: SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE`);
+    console.log(` Storage Engine: PostgreSQL System of Record (Outbox Enabled)`);
+    console.log(`================================================================`);
+  });
+}
+
+module.exports = app;

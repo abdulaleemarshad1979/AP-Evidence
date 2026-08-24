@@ -1,5 +1,20 @@
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('[AP PLATFORM] Initializing Enterprise Intelligence Dashboard...');
+  console.log('[AP PLATFORM] Initializing Synthetic Intelligence Dashboard...');
+
+  // User Switcher listener for ABAC testing
+  const userSwitcher = document.getElementById('user-switcher');
+  if (userSwitcher) {
+    userSwitcher.addEventListener('change', async (e) => {
+      API.setUserId(e.target.value);
+      alert(`Switched active synthetic user context to: ${e.target.value}`);
+      try {
+        await CasesComponent.renderCasesTable();
+        await AuditComponent.renderAuditTable();
+      } catch (err) {
+        console.warn('User switch refresh error:', err);
+      }
+    });
+  }
 
   // Global window references for cross-component calls
   window.CasesComponent = CasesComponent;

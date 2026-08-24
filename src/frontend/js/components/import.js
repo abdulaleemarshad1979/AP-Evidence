@@ -5,59 +5,60 @@ const ImportComponent = {
   },
 
   async renderHistoryTable() {
-    const historyTable = document.getElementById('import-history-table');
-    if (!historyTable) return;
+    const tableBody = document.getElementById('import-history-table');
+    if (!tableBody) return;
 
     try {
       const data = await API.get('/import/history');
-      historyTable.innerHTML = '';
+      tableBody.innerHTML = '';
 
-      data.imports.forEach(imp => {
+      data.imports.forEach(b => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="mono" style="color: var(--accent-cyan);">${imp.batchId}</td>
-          <td>${imp.sourceFeed}</td>
-          <td><span class="mono">${imp.ingestedEvents} Records</span></td>
-          <td class="mono">${new Date(imp.timestamp).toLocaleTimeString()}</td>
-          <td><span class="badge-status badge-low">${imp.status}</span></td>
+          <td class="mono" style="color: var(--accent-cyan); font-weight: 600;">${b.batchId}</td>
+          <td><strong>${b.sourceFeed}</strong><br><small style="color: var(--text-muted);">${b.feedType}</small></td>
+          <td><span class="badge-status badge-low">${b.acceptedRecords} Accepted</span></td>
+          <td><span class="badge-status ${b.quarantinedRecords > 0 ? 'badge-critical' : 'badge-low'}">${b.quarantinedRecords} Quarantined</span></td>
+          <td><span class="badge-status ${b.duplicateRecords > 0 ? 'badge-high' : 'badge-low'}">${b.duplicateRecords} Duplicates</span></td>
+          <td><span class="badge-status badge-low">${b.status}</span></td>
         `;
-        historyTable.appendChild(tr);
+        tableBody.appendChild(tr);
       });
     } catch (err) {
-      historyTable.innerHTML = `<tr><td colspan="5">No import history found.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="6" style="color: var(--accent-crimson);">${err.message}</td></tr>`;
     }
   },
 
   bindEvents() {
     const form = document.getElementById('ingest-form');
-    if (!form) return;
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const feedName = document.getElementById('import-feed-name').value;
+        const jsonStr = document.getElementById('import-json-payload').value;
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const feedName = document.getElementById('import-feed-name').value;
-      const classification = document.getElementById('import-classification').value;
-      const jsonRaw = document.getElementById('import-json-payload').value;
+        let records = [];
+        try {
+          records = JSON.parse(jsonStr);
+        } catch (err) {
+          alert('Invalid JSON formatting in telemetry records payload.');
+          return;
+        }
 
-      let records = [];
-      try {
-        records = JSON.parse(jsonRaw);
-      } catch (err) {
-        alert('Invalid JSON in payload field: ' + err.message);
-        return;
-      }
-
-      try {
-        const res = await API.post('/import/ingest', {
-          sourceFeed: feedName,
-          classification,
-          records
-        });
-        alert(`Successfully ingested ${res.summary.ingestedEvents} records! Batch ID: ${res.summary.batchId}`);
-        await this.renderHistoryTable();
-        if (window.AuditComponent) window.AuditComponent.renderAuditTable();
-      } catch (err) {
-        alert('Ingestion error: ' + err.message);
-      }
-    });
+        try {
+          const res = await API.post('/import/ingest', {
+            sourceFeed: feedName,
+            feedType: 'SYNTHETIC_TELEMETRY',
+            records
+          });
+          alert(`Ingestion Executed cleanly!\nAccepted: ${res.summary.acceptedRecords}\nQuarantined: ${res.summary.quarantinedRecords}\nDuplicates: ${res.summary.duplicateRecords}`);
+          document.getElementById('import-json-payload').value = '';
+          await this.renderHistoryTable();
+          if (window.AuditComponent) window.AuditComponent.renderAuditTable();
+        } catch (err) {
+          alert('Ingestion error: ' + err.message);
+        }
+      });
+    }
   }
 };

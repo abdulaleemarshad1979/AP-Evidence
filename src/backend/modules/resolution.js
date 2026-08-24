@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const { getContextUser } = require('../middleware/abac');
 
 // Get all entity resolution candidates
 router.get('/candidates', (req, res) => {
@@ -18,7 +19,8 @@ router.get('/candidates', (req, res) => {
 
 // Run manual / automated Entity Resolution Scan
 router.post('/run-scan', (req, res) => {
-  const entities = db.entities;
+  const user = getContextUser(req);
+  const entities = db.getEntities();
   let newCandidatesCount = 0;
 
   for (let i = 0; i < entities.length; i++) {
@@ -28,19 +30,31 @@ router.post('/run-scan', (req, res) => {
 
       if (e1.type !== e2.type && !(e1.type === 'Person' && e2.type === 'Person')) continue;
 
-      let score = 0;
-      const reasons = [];
+      const comparedFields = ['name', 'primaryPhone', 'passportNo'];
+      const individualScores = {};
+      const conflicts = [];
+      let totalScore = 0;
 
       // Phone match
-      if (e1.primaryPhone && e2.primaryPhone && e1.primaryPhone === e2.primaryPhone) {
-        score += 0.40;
-        reasons.push({ feature: 'Primary Phone Match', score: 1.0, note: `Exact match: ${e1.primaryPhone}` });
+      const p1 = e1.identifierFields?.primaryPhone;
+      const p2 = e2.identifierFields?.primaryPhone;
+      if (p1 && p2 && p1 === p2) {
+        individualScores.primaryPhone = 1.0;
+        totalScore += 0.40;
+      } else if (p1 && p2) {
+        individualScores.primaryPhone = 0.0;
+        conflicts.push({ field: 'primaryPhone', valA: p1, valB: p2 });
       }
 
       // Passport match
-      if (e1.passportNo && e2.passportNo && e1.passportNo === e2.passportNo) {
-        score += 0.45;
-        reasons.push({ feature: 'Passport Document Match', score: 1.0, note: `Exact match: ${e1.passportNo}` });
+      const pass1 = e1.identifierFields?.passportNo;
+      const pass2 = e2.identifierFields?.passportNo;
+      if (pass1 && pass2 && pass1 === pass2) {
+        individualScores.passportNo = 1.0;
+        totalScore += 0.45;
+      } else if (pass1 && pass2) {
+        individualScores.passportNo = 0.0;
+        conflicts.push({ field: 'passportNo', valA: pass1, valB: pass2 });
       }
 
       // Name similarity
@@ -48,39 +62,39 @@ router.post('/run-scan', (req, res) => {
         const n1 = e1.name.toLowerCase();
         const n2 = e2.name.toLowerCase();
         if (n1 === n2) {
-          score += 0.35;
-          reasons.push({ feature: 'Exact Name Match', score: 1.0, note: `Name match: ${e1.name}` });
+          individualScores.name = 1.0;
+          totalScore += 0.35;
         } else if (n1.includes(n2.slice(0, 3)) || n2.includes(n1.slice(0, 3))) {
-          score += 0.20;
-          reasons.push({ feature: 'Partial Alias / Name Similarity', score: 0.70, note: `Similar names: ${e1.name} / ${e2.name}` });
+          individualScores.name = 0.75;
+          totalScore += 0.20;
+        } else {
+          individualScores.name = 0.10;
         }
       }
 
-      const totalScore = Math.min(1.0, parseFloat(score.toFixed(2)));
+      const matchScore = Math.min(1.0, parseFloat(totalScore.toFixed(2)));
 
-      if (totalScore >= 0.65) {
-        const existing = db.resolutionCandidates.find(rc => 
-          (rc.entityA === e1.id && rc.entityB === e2.id) || (rc.entityA === e2.id && rc.entityB === e1.id)
+      if (matchScore >= 0.65) {
+        const existing = db.queryOne(
+          `SELECT id FROM resolution_candidates WHERE (entity_a = '${e1.id}' AND entity_b = '${e2.id}') OR (entity_a = '${e2.id}' AND entity_b = '${e1.id}')`
         );
 
         if (!existing) {
-          const newCand = {
-            id: `RES-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            entityA: e1.id,
-            entityB: e2.id,
-            matchScore: totalScore,
-            status: 'PENDING_REVIEW',
-            reasons,
-            createdAt: new Date().toISOString()
-          };
-          db.resolutionCandidates.push(newCand);
+          const id = `RES-SYN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          const ruleVersion = 'v2.1-deterministic-probabilistic';
+
+          db.execute(`
+            INSERT INTO resolution_candidates (id, entity_a, entity_b, rule_version, match_score, compared_fields, individual_scores, conflicts, human_review_status, review_priority, status)
+            VALUES ('${id}', '${e1.id}', '${e2.id}', '${ruleVersion}', ${matchScore}, '${JSON.stringify(comparedFields).replace(/'/g, "''")}', '${JSON.stringify(individualScores).replace(/'/g, "''")}', '${JSON.stringify(conflicts).replace(/'/g, "''")}', 'PENDING_REVIEW', 'P1_HIGH', 'PENDING_REVIEW')
+          `);
           newCandidatesCount++;
         }
       }
     }
   }
 
-  db.logAudit('USR-101', 'Dr. Sarah Vance', 'RUN_ENTITY_RESOLUTION', 'Entity Resolution', `Ran automated entity resolution scan. Identified ${newCandidatesCount} new candidate pairs.`);
+  db.logAudit(user.id, user.name, 'RUN_ENTITY_RESOLUTION', 'Entity Resolution', `Ran entity resolution scan v2.1. Generated ${newCandidatesCount} resolution candidate pairs.`);
+  db.emitOutboxEvent('ENTITY_RESOLUTION', 'SCAN-RUN', 'RESOLUTION_SCAN_COMPLETED', { newCandidatesCount });
 
   res.json({
     message: 'Entity Resolution Scan Completed',

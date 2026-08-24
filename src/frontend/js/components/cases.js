@@ -17,8 +17,8 @@ const CasesComponent = {
         tr.innerHTML = `
           <td class="mono" style="color: var(--accent-cyan); font-weight: 600;">${c.id}</td>
           <td><strong>${c.title}</strong><br><small style="color: var(--text-muted);">${c.codeName}</small></td>
-          <td><span class="clearance-badge">${c.classification}</span></td>
-          <td><span class="badge-status badge-${c.threatLevel.toLowerCase()}">${c.threatLevel}</span></td>
+          <td><span class="clearance-badge" style="font-size:0.7rem; background:rgba(220,53,69,0.1); color:#ff6b6b;">${c.classification}</span></td>
+          <td><span class="badge-status badge-high">${c.status}</span></td>
           <td><span class="mono">${c.targetEntityIds ? c.targetEntityIds.length : 0} Target(s)</span></td>
           <td>
             <button class="btn btn-primary btn-sm btn-select-case" data-id="${c.id}" data-title="${c.title}">
@@ -29,7 +29,7 @@ const CasesComponent = {
         tableBody.appendChild(tr);
       });
     } catch (err) {
-      tableBody.innerHTML = `<tr><td colspan="6" style="color: var(--accent-crimson);">Failed to load cases.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="6" style="color: var(--accent-crimson);">${err.message}</td></tr>`;
     }
   },
 
@@ -41,8 +41,7 @@ const CasesComponent = {
         const caseData = {
           title: document.getElementById('case-title').value,
           codeName: document.getElementById('case-codename').value,
-          classification: document.getElementById('case-classification').value,
-          threatLevel: document.getElementById('case-threat').value,
+          reviewPriority: document.getElementById('case-threat').value,
           description: document.getElementById('case-desc').value
         };
 
@@ -52,7 +51,7 @@ const CasesComponent = {
           await this.renderCasesTable();
           if (window.AuditComponent) window.AuditComponent.renderAuditTable();
         } catch (err) {
-          alert('Error creating case: ' + err.message);
+          alert('Error creating synthetic case: ' + err.message);
         }
       });
     }

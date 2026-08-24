@@ -16,71 +16,96 @@ const EvidenceComponent = {
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="mono" style="color: var(--accent-cyan); font-weight: 600;">${ev.id}</td>
-          <td><strong>${ev.title}</strong><br><small style="color: var(--text-muted);">${ev.sourceDevice}</small></td>
-          <td><span class="badge-status badge-medium">${ev.mediaType}</span></td>
-          <td class="mono">${ev.fileSize}</td>
-          <td class="mono" style="font-size: 0.72rem; color: var(--accent-emerald);">${ev.sha256}</td>
+          <td><strong>${ev.title}</strong><br><small style="color: var(--text-muted);">${ev.mediaType} (${ev.fileSize})</small></td>
+          <td><span class="badge-status badge-low">${ev.evidenceStatus}</span></td>
+          <td><span class="badge-status ${ev.isOriginal ? 'badge-low' : 'badge-high'}">${ev.isOriginal ? 'ORIGINAL' : 'DERIVED'}</span></td>
+          <td class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">${ev.sha256.slice(0, 16)}...</td>
           <td>${ev.custodian}</td>
           <td>
             <button class="btn btn-primary btn-sm btn-view-ev" data-id="${ev.id}">
-              <i class="fa-solid fa-shield"></i> Verify Custody
+              <i class="fa-solid fa-eye"></i> View & Hash
+            </button>
+            <button class="btn btn-warning btn-sm btn-export-ev" data-id="${ev.id}">
+              <i class="fa-solid fa-download"></i> Export
             </button>
           </td>
         `;
         tableBody.appendChild(tr);
       });
     } catch (err) {
-      tableBody.innerHTML = `<tr><td colspan="7">Failed to load evidence vault.</td></tr>`;
-    }
-  },
-
-  async showModal(id) {
-    const modal = document.getElementById('evidence-modal');
-    const title = document.getElementById('modal-ev-title');
-    const content = document.getElementById('modal-ev-content');
-
-    try {
-      const res = await API.get(`/evidence/${id}`);
-      const ev = res.evidence;
-
-      title.innerText = `EVIDENCE FILE: ${ev.id}`;
-      content.innerHTML = `
-        <div><strong>Title:</strong> ${ev.title}</div>
-        <div><strong>Classification:</strong> <span class="clearance-badge">${ev.classification}</span></div>
-        <div><strong>Source Device:</strong> ${ev.sourceDevice}</div>
-        <div><strong>Current Custodian:</strong> ${ev.custodian}</div>
-        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--accent-emerald); padding: 0.6rem; border-radius: 4px;">
-          <strong style="color: var(--accent-emerald);"><i class="fa-solid fa-check-double"></i> SHA-256 INTEGRITY VERIFIED:</strong><br>
-          <span class="mono" style="font-size: 0.75rem; word-break: break-all;">${ev.sha256}</span>
-        </div>
-        <div><strong>Chain of Custody Audit Log:</strong></div>
-        <div style="max-height: 200px; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px;">
-          ${ev.chainOfCustody.map(c => `
-            <div style="border-bottom: 1px solid var(--border-color); padding: 0.4rem 0; font-size: 0.8rem;">
-              <span class="mono" style="color: var(--accent-cyan);">${new Date(c.timestamp).toLocaleString()}</span> - <strong>${c.user}</strong><br>
-              <span class="badge-status badge-low">${c.action}</span>: ${c.notes}
-            </div>
-          `).join('')}
-        </div>
-      `;
-
-      modal.classList.add('active');
-    } catch (err) {
-      alert('Error fetching evidence: ' + err.message);
+      tableBody.innerHTML = `<tr><td colspan="7">${err.message}</td></tr>`;
     }
   },
 
   bindEvents() {
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-view-ev');
-      if (btn) {
-        const id = btn.getAttribute('data-id');
-        this.showModal(id);
+    const modal = document.getElementById('evidence-modal');
+    const closeBtn = document.getElementById('btn-close-modal');
+
+    if (closeBtn && modal) {
+      closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+    }
+
+    document.addEventListener('click', async (e) => {
+      const viewBtn = e.target.closest('.btn-view-ev');
+      if (viewBtn) {
+        const evId = viewBtn.getAttribute('data-id');
+        try {
+          const res = await API.get(`/evidence/${evId}`);
+          const ev = res.evidence;
+          document.getElementById('modal-ev-title').innerText = `EVIDENCE VAULT: ${ev.id}`;
+          document.getElementById('modal-ev-content').innerHTML = `
+            <div><strong>Title:</strong> ${ev.title}</div>
+            <div><strong>Classification:</strong> ${ev.classification}</div>
+            <div><strong>Record Lineage:</strong> ${ev.isOriginal ? 'ORIGINAL SOURCE CAPTURE' : `DERIVED ANALYSIS (Parent: ${ev.parentEvidenceId})`}</div>
+            <div><strong>Server-Side SHA-256:</strong> <code class="mono" style="color: var(--accent-emerald);">${ev.sha256}</code></div>
+            <div><strong>Custodian:</strong> ${ev.custodian}</div>
+            <div><strong>Source Device:</strong> ${ev.sourceDevice}</div>
+            <div>
+              <strong>Append-Only Chain of Custody Ledger:</strong>
+              <div class="table-container" style="margin-top: 0.5rem;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>Notes</th>
+                      <th>Hash Signature</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${ev.chainOfCustody.map(c => `
+                      <tr>
+                        <td class="mono">${c.timestamp}</td>
+                        <td>${c.user}</td>
+                        <td><span class="badge-status badge-low">${c.action}</span></td>
+                        <td>${c.notes}</td>
+                        <td class="mono" style="font-size:0.7rem;">${c.hashSignature.slice(0, 12)}...</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+          modal.classList.add('active');
+          await this.renderEvidenceTable();
+          if (window.AuditComponent) window.AuditComponent.renderAuditTable();
+        } catch (err) {
+          alert('Evidence inspection error: ' + err.message);
+        }
       }
 
-      const closeBtn = e.target.closest('#btn-close-modal');
-      if (closeBtn) {
-        document.getElementById('evidence-modal').classList.remove('active');
+      const exportBtn = e.target.closest('.btn-export-ev');
+      if (exportBtn) {
+        const evId = exportBtn.getAttribute('data-id');
+        try {
+          const res = await API.get(`/evidence/export/${evId}`);
+          alert(`Evidence export authorized!\nServer-Side SHA-256: ${res.integrityCheck.serverSideHash}\nExported by: ${res.exportedBy}`);
+          if (window.AuditComponent) window.AuditComponent.renderAuditTable();
+        } catch (err) {
+          alert('Export ABAC Error: ' + err.message);
+        }
       }
     });
   }

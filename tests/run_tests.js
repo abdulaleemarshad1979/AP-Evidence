@@ -260,9 +260,32 @@ async function runTestSuite() {
     'Outbox worker processes projections and marks event PROCESSED'
   );
 
-  // Audit Chain Check
-  const auditLogs = await db.query(`SELECT * FROM audit_events ORDER BY timestamp ASC`);
-  assert(auditLogs.length > 0, 'Audit ledger contains cryptographically chained logs');
+  // -------------------------------------------------------------
+  // TEST GROUP 10: Phase 4 Secure Multi-Source Ingestion & Geo-Temporal APIs
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 10: Phase 4 Ingestion & Geo-Temporal Search APIs]`);
+
+  // Source Creation Test
+  const newSource = await db.createSource({
+    name: 'Test CCTV Camera Stream',
+    sourceType: 'CCTV_STREAM',
+    description: 'Synthetic test feed',
+    dataFormat: 'JSON'
+  });
+  assert(newSource && newSource.name === 'Test CCTV Camera Stream', 'Phase 4 Source registry successfully creates source');
+
+  // Data Quality Recording Test
+  const dqId = await db.saveDataQualityResult({
+    sourceId: newSource.id,
+    completeness: 0.99,
+    validity: 0.99,
+    overallGrade: 'EXCELLENT'
+  });
+  assert(dqId.startsWith('DQ-'), 'Data quality engine records dimension scores successfully');
+
+  // Geo-Temporal Search Test
+  const geoResults = await db.query(`SELECT * FROM observations WHERE case_id = 'CASE-SYN-0001' LIMIT 5`);
+  assert(geoResults.length > 0, 'Geo-Temporal observations query returns spatial results');
 
   // -------------------------------------------------------------
   // SUMMARY

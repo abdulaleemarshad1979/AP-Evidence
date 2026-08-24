@@ -47,11 +47,17 @@ class EvidenceStorageService {
           ContentType: contentType
         }));
       } catch (err) {
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error(`[S3 STORAGE] Fail Closed: Object storage upload failed in production: ${err.message}`);
+        }
         console.warn(`[S3 STORAGE] Upload failed to ${this.endpoint}, storing locally:`, err.message);
         const filePath = path.join(LOCAL_OBJECT_DIR, objectKey.replace(/\//g, '_'));
         fs.writeFileSync(filePath, dataBuffer);
       }
     } else {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('[S3 STORAGE] Fail Closed: MinIO/S3 object storage is required in production environment.');
+      }
       const filePath = path.join(LOCAL_OBJECT_DIR, objectKey.replace(/\//g, '_'));
       fs.writeFileSync(filePath, dataBuffer);
     }

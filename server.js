@@ -90,9 +90,9 @@ app.get('/api/system/status', async (req, res) => {
   const candidates = await db.query(`SELECT COUNT(*) as count FROM resolution_candidates`);
 
   res.json({
-    system: 'AP Spatio-Temporal Subject Intelligence Platform',
-    version: '2.0.0-FOUNDATION-PASS-2',
-    status: 'COMPLIANT_FOUNDATION',
+    system: 'Andhra Pradesh Intelligence System',
+    version: '3.0.0-PHASE-3-INVESTIGATOR-WORKSPACE',
+    status: 'PHASE_3_OPERATIONAL',
     classification: 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
     databaseEngine: 'PostgreSQL 16 + PostGIS (Row-Level Security & Parameterized Queries)',
     objectStorage: 'MinIO/S3-Compatible Evidence Vault',
@@ -147,7 +147,7 @@ async function startServer() {
 
     app.listen(PORT, () => {
       console.log(`================================================================`);
-      console.log(` AP SPATIO-TEMPORAL INTELLIGENCE PLATFORM (Foundation Pass 2)`);
+      console.log(` ANDHRA PRADESH INTELLIGENCE SYSTEM (Phase 3 Operational)`);
       console.log(` Running on: http://localhost:${PORT}`);
       console.log(` Database: PostgreSQL 16 + PostGIS`);
       console.log(` Classification: SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE`);

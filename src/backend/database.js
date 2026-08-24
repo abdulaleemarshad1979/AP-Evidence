@@ -45,6 +45,9 @@ class PostgreSQLDatabase {
     }
 
     if (!connected) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('[POSTGRES DB] Fail Closed: PostgreSQL database connection failed in production mode. Fallback to pg-mem is strictly forbidden in production.');
+      }
       // Isolated unit-test fallback using pg-mem for npm test execution without live Postgres server
       try {
         const { newDb } = require('pg-mem');

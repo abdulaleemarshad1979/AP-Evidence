@@ -4,8 +4,7 @@ const db = require('../database');
 const { authenticateMiddleware } = require('../middleware/auth');
 const { abacMiddleware } = require('../middleware/abac');
 
-// Spatio-Temporal tracks & Leaflet map scrubber data (Case-scoped ABAC, PostGIS geometry)
-router.get('/tracks', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || 'CASE-SYN-0001'), async (req, res) => {
+const handleTracksQuery = async (req, res) => {
   const { caseId, entityId, startDate, endDate } = req.query;
   const targetCaseId = caseId || 'CASE-SYN-0001';
 
@@ -33,6 +32,7 @@ router.get('/tracks', authenticateMiddleware, abacMiddleware('READ', async req =
     entityId: o.entity_id,
     caseId: o.case_id,
     eventType: o.observation_type,
+    description: `${o.observation_type} ping at ${o.location_name}`,
     timestamp: o.timestamp,
     locationName: o.location_name,
     latitude: o.latitude,
@@ -45,7 +45,14 @@ router.get('/tracks', authenticateMiddleware, abacMiddleware('READ', async req =
 
   await db.logAudit(req.user.id, req.user.name, 'QUERY_SPATIO_TEMPORAL', 'Geo Engine', `Queried ${tracks.length} spatio-temporal trajectory nodes for case ${targetCaseId}`, entityId || null, targetCaseId);
 
-  res.json({ tracks });
-});
+  res.json({
+    tracks,
+    events: tracks
+  });
+};
+
+// Spatio-Temporal tracks & Leaflet map scrubber data (Case-scoped ABAC, PostGIS geometry)
+router.get('/tracks', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || 'CASE-SYN-0001'), handleTracksQuery);
+router.get('/trajectory', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || 'CASE-SYN-0001'), handleTracksQuery);
 
 module.exports = router;

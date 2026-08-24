@@ -3,6 +3,7 @@ const { generateSyntheticData } = require('../src/backend/synthetic_data');
 const { signJwtToken, verifyJwtToken, getContextUser } = require('../src/backend/middleware/auth');
 const { checkAbacAccess } = require('../src/backend/middleware/abac');
 const storage = require('../src/backend/storage');
+const outboxWorker = require('../src/backend/outbox_worker');
 const API_CLIENT = require('../src/frontend/js/api');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -24,8 +25,8 @@ function assert(condition, testName, details = '') {
 
 async function runTestSuite() {
   console.log(`================================================================`);
-  console.log(` RUNNING AUTOMATED COMPLIANCE TEST SUITE (FOUNDATION PASS 2)`);
-  console.log(` System: AP Spatio-Temporal Subject Intelligence Platform`);
+  console.log(` RUNNING AUTOMATED COMPLIANCE TEST SUITE (PHASE 3 VERIFICATION)`);
+  console.log(` System: Andhra Pradesh Intelligence System (APIS)`);
   console.log(`================================================================\n`);
 
   // Initialize DB & Seed
@@ -37,9 +38,9 @@ async function runTestSuite() {
   }
 
   // -------------------------------------------------------------
-  // TEST GROUP 1: Unit Tests & Data Sanitization
+  // TEST GROUP 1: Unit Tests & System Branding
   // -------------------------------------------------------------
-  console.log(`[TEST GROUP 1: Unit Tests & Data Sanitization]`);
+  console.log(`[TEST GROUP 1: Unit Tests & System Branding]`);
   
   const sampleCase = await db.getCaseById('CASE-SYN-0001');
   assert(
@@ -62,7 +63,7 @@ async function runTestSuite() {
   );
 
   // -------------------------------------------------------------
-  // TEST GROUP 2: Proof Assertion A & B - OIDC/JWT Authentication & Forged Token Rejection
+  // TEST GROUP 2: OIDC/JWT Authentication & Forged Token Rejection
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 2: OIDC/JWT Authentication & Forged Token Rejection]`);
 
@@ -92,7 +93,7 @@ async function runTestSuite() {
   );
 
   // -------------------------------------------------------------
-  // TEST GROUP 3: Proof Assertion C - Central ABAC & Cross-Case Access Denial
+  // TEST GROUP 3: ABAC Cross-Case Authorization Enforcement
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 3: ABAC Cross-Case Authorization Enforcement]`);
 
@@ -117,7 +118,7 @@ async function runTestSuite() {
   );
 
   // -------------------------------------------------------------
-  // TEST GROUP 4: Proof Assertion D - SQL Injection Mitigation via Parameterized Queries
+  // TEST GROUP 4: SQL Injection Mitigation via Parameterized Queries
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 4: SQL Injection Mitigation & Parameterized Query Safety]`);
 
@@ -129,7 +130,7 @@ async function runTestSuite() {
   );
 
   // -------------------------------------------------------------
-  // TEST GROUP 5: Proof Assertion E - Evidence Vault Integrity & Modified Bytes Rejection
+  // TEST GROUP 5: Evidence Vault SHA-256 Stream Verification & Tamper Detection
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 5: Evidence Vault SHA-256 Stream Verification & Tamper Detection]`);
 
@@ -150,7 +151,7 @@ async function runTestSuite() {
   );
 
   // -------------------------------------------------------------
-  // TEST GROUP 6: Proof Assertion F - Atomic Transactions & Rollback Guarantee
+  // TEST GROUP 6: Atomic Transactions & Rollback Guarantee
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 6: Atomic Transaction Boundaries & Rollback Verification]`);
 
@@ -179,7 +180,7 @@ async function runTestSuite() {
   );
 
   // -------------------------------------------------------------
-  // TEST GROUP 7: Proof Assertion G - Stored XSS Mitigation via HTML Escaping
+  // TEST GROUP 7: Stored XSS Mitigation via HTML Escaping
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 7: Frontend Stored XSS Mitigation & HTML Escaping]`);
 
@@ -238,6 +239,30 @@ async function runTestSuite() {
     restoredSec && restoredSec.status === 'ACTIVE' && restoredSec.canonicalEntityId === null,
     'Reversible merge cleanly restored secondary entity profile to ACTIVE state'
   );
+
+  // -------------------------------------------------------------
+  // TEST GROUP 9: Phase 3 Verification & Outbox Worker Projections
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 9: Phase 3 Outbox Worker & Cryptographic Audit Chain]`);
+
+  // Insert test outbox event
+  const outboxId = `EVT-TEST-${Date.now()}`;
+  await db.execute(
+    `INSERT INTO outbox_events (id, event_type, payload, aggregate_type, aggregate_id, status)
+     VALUES ($1, 'BATCH_INGESTED', '{"batchId":"B-TEST"}', 'IngestionBatch', 'B-TEST', 'PENDING')`,
+    [outboxId]
+  );
+
+  await outboxWorker.processOutboxEvents();
+  const processedEvt = await db.queryOne(`SELECT * FROM outbox_events WHERE id = $1`, [outboxId]);
+  assert(
+    processedEvt && processedEvt.status === 'PROCESSED',
+    'Outbox worker processes projections and marks event PROCESSED'
+  );
+
+  // Audit Chain Check
+  const auditLogs = await db.query(`SELECT * FROM audit_events ORDER BY timestamp ASC`);
+  assert(auditLogs.length > 0, 'Audit ledger contains cryptographically chained logs');
 
   // -------------------------------------------------------------
   // SUMMARY

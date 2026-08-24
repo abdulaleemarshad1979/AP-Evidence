@@ -72,7 +72,7 @@ router.get('/reconcile/:batchId', authenticateMiddleware, async (req, res) => {
       errorDetails: r.error_details,
       rawPayload: JSON.parse(r.raw_payload)
     }))
-  }));
+  });
 });
 
 // Ingest structured synthetic raw data payload (Transactional, ABAC INGEST protection, Parameterized Queries)

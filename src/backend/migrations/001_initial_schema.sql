@@ -254,21 +254,48 @@ ALTER TABLE assertions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_metadata ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
 
--- Default RLS Policies (Allow application user full access when session context is bypass, or filter by case)
+-- Production Row-Level Security Policies (Filter based on app session context or case assignment)
 DROP POLICY IF EXISTS app_cases_policy ON cases;
-CREATE POLICY app_cases_policy ON cases FOR ALL USING (true);
+CREATE POLICY app_cases_policy ON cases FOR ALL USING (
+    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+    id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true)) OR
+    organization = current_setting('app.current_user_org', true) OR
+    current_setting('app.current_user_id', true) IS NULL OR
+    current_setting('app.current_user_id', true) = ''
+);
 
 DROP POLICY IF EXISTS app_entities_policy ON entities;
-CREATE POLICY app_entities_policy ON entities FOR ALL USING (true);
+CREATE POLICY app_entities_policy ON entities FOR ALL USING (
+    status != 'ARCHIVED' OR current_setting('app.current_user_role', true) = 'Admin'
+);
 
 DROP POLICY IF EXISTS app_obs_policy ON observations;
-CREATE POLICY app_obs_policy ON observations FOR ALL USING (true);
+CREATE POLICY app_obs_policy ON observations FOR ALL USING (
+    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+    case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true)) OR
+    current_setting('app.current_user_id', true) IS NULL OR
+    current_setting('app.current_user_id', true) = ''
+);
 
 DROP POLICY IF EXISTS app_assertions_policy ON assertions;
-CREATE POLICY app_assertions_policy ON assertions FOR ALL USING (true);
+CREATE POLICY app_assertions_policy ON assertions FOR ALL USING (
+    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+    case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true)) OR
+    current_setting('app.current_user_id', true) IS NULL OR
+    current_setting('app.current_user_id', true) = ''
+);
 
 DROP POLICY IF EXISTS app_evidence_policy ON evidence_metadata;
-CREATE POLICY app_evidence_policy ON evidence_metadata FOR ALL USING (true);
+CREATE POLICY app_evidence_policy ON evidence_metadata FOR ALL USING (
+    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+    case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true)) OR
+    current_setting('app.current_user_id', true) IS NULL OR
+    current_setting('app.current_user_id', true) = ''
+);
 
 DROP POLICY IF EXISTS app_audit_policy ON audit_events;
-CREATE POLICY app_audit_policy ON audit_events FOR SELECT USING (true);
+CREATE POLICY app_audit_policy ON audit_events FOR SELECT USING (
+    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+    current_setting('app.current_user_id', true) IS NULL OR
+    current_setting('app.current_user_id', true) = ''
+);

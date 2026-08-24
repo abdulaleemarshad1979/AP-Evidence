@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Foundation Pass 2 Verification Suite
+    name: Master Build Verification Suite
     runs-on: ubuntu-latest
 
     services:
@@ -22,19 +22,6 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      minio:
-        image: minio/minio:RELEASE.2024-01-29T20-56-42Z
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -56,9 +43,6 @@ jobs:
         env:
           NODE_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/ap_evidence
-          MINIO_ENDPOINT: http://localhost:9000
-          MINIO_BUCKET: ap-evidence-vault
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadmin
           JWT_SECRET: AP_INTELLIGENCE_PLATFORM_SECURE_JWT_SECRET_2026_PASS2
         run: npm test
+

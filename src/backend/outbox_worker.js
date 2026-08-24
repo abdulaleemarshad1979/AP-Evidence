@@ -1,4 +1,6 @@
 const db = require('./database');
+const resolutionModule = require('./modules/resolution');
+const compareEntities = resolutionModule.compareEntities;
 
 class OutboxWorker {
   constructor() {
@@ -50,18 +52,29 @@ class OutboxWorker {
       // Real Projection Processing Loop based on Event Type
       switch (event.event_type) {
         case 'BATCH_INGESTED': {
-          // Projection: Auto-calculate resolution candidate scores for newly ingested telemetry
+          // Projection: Dynamic Jaro-Winkler explainable resolution candidate calculation
           const entities = await db.getEntities();
           if (entities.length >= 2) {
             const e1 = entities[0];
             const e2 = entities[1];
-            const candidateId = `RES-PROJ-${Date.now().toString().slice(-4)}`;
-            await db.execute(
-              `INSERT INTO resolution_candidates (id, entity_a, entity_b, rule_version, match_score, compared_fields, individual_scores, conflicts, human_review_status, review_priority, status)
-               VALUES ($1, $2, $3, 'v2.2-outbox-projection', 0.85, $4, $5, '[]', 'PENDING_REVIEW', 'P2_MEDIUM', 'PENDING_REVIEW')
-               ON CONFLICT (id) DO NOTHING`,
-              [candidateId, e1.id, e2.id, JSON.stringify(['name', 'aliases']), JSON.stringify({ name: 0.85 })]
-            );
+            const match = compareEntities(e1, e2);
+            if (match.matchScore >= 0.50) {
+              const candidateId = `RES-PROJ-${Date.now().toString().slice(-4)}`;
+              await db.execute(
+                `INSERT INTO resolution_candidates (id, entity_a, entity_b, rule_version, match_score, compared_fields, individual_scores, conflicts, human_review_status, review_priority, status)
+                 VALUES ($1, $2, $3, 'v2.2-outbox-projection', $4, $5, $6, $7, 'PENDING_REVIEW', 'P2_MEDIUM', 'PENDING_REVIEW')
+                 ON CONFLICT (id) DO NOTHING`,
+                [
+                  candidateId,
+                  e1.id,
+                  e2.id,
+                  match.matchScore,
+                  JSON.stringify(match.comparedFields),
+                  JSON.stringify(match.individualScores),
+                  JSON.stringify(match.conflicts)
+                ]
+              );
+            }
           }
           break;
         }

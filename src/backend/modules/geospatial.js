@@ -4,55 +4,69 @@ const db = require('../database');
 const { authenticateMiddleware } = require('../middleware/auth');
 const { abacMiddleware } = require('../middleware/abac');
 
-const handleTracksQuery = async (req, res) => {
-  const { caseId, entityId, startDate, endDate } = req.query;
-  const targetCaseId = caseId || 'CASE-SYN-0001';
+// Get bounding box observations (PostGIS ST_MakeEnvelope spatial query)
+router.get('/bbox', authenticateMiddleware, abacMiddleware('READ', async req => req.query.case_id || req.headers['x-case-id'] || 'CASE-SYN-0001'), async (req, res) => {
+  const { minLon, minLat, maxLon, maxLat, case_id } = req.query;
+  const targetCaseId = case_id || req.headers['x-case-id'] || 'CASE-SYN-0001';
 
-  let sql = `SELECT id, entity_id, case_id, observation_type, timestamp, location_name, latitude, longitude, confidence_score, evidence_status, raw_data, evidence_id FROM observations WHERE case_id = $1`;
-  const params = [targetCaseId];
-
-  if (entityId) {
-    params.push(entityId);
-    sql += ` AND entity_id = $${params.length}`;
+  let observations;
+  if (!db.isPgMem && minLon && minLat && maxLon && maxLat) {
+    observations = await db.query(
+      `SELECT * FROM observations 
+       WHERE case_id = $1 AND location_geom && ST_MakeEnvelope($2, $3, $4, $5, 4326)
+       ORDER BY timestamp DESC`,
+      [targetCaseId, parseFloat(minLon), parseFloat(minLat), parseFloat(maxLon), parseFloat(maxLat)]
+    );
+  } else {
+    observations = await db.query(
+      `SELECT * FROM observations WHERE case_id = $1 ORDER BY timestamp DESC`,
+      [targetCaseId]
+    );
   }
-  if (startDate) {
-    params.push(startDate);
-    sql += ` AND timestamp >= $${params.length}`;
+
+  res.json({ observations });
+});
+
+// PostGIS ST_DWithin Co-location Detection Engine
+router.get('/colocation', authenticateMiddleware, abacMiddleware('READ', async req => req.query.case_id || req.headers['x-case-id'] || 'CASE-SYN-0001'), async (req, res) => {
+  const { target_id, radius_meters, case_id } = req.query;
+  const targetCaseId = case_id || req.headers['x-case-id'] || 'CASE-SYN-0001';
+  const radius = parseFloat(radius_meters) || 500;
+
+  const targetObs = await db.query(`SELECT * FROM observations WHERE entity_id = $1 AND case_id = $2`, [target_id || 'SUB-00001', targetCaseId]);
+
+  let colocated;
+  if (!db.isPgMem && targetObs.length > 0) {
+    colocated = await db.query(
+      `SELECT DISTINCT o2.* 
+       FROM observations o1
+       JOIN observations o2 ON o1.entity_id != o2.entity_id AND o1.case_id = o2.case_id
+       WHERE o1.entity_id = $1 AND o1.case_id = $2
+         AND ST_DWithin(o1.location_geom, o2.location_geom, $3)`,
+      [target_id || 'SUB-00001', targetCaseId, radius]
+    );
+  } else {
+    colocated = await db.query(`SELECT * FROM observations WHERE case_id = $1 AND entity_id != $2`, [targetCaseId, target_id || 'SUB-00001']);
   }
-  if (endDate) {
-    params.push(endDate);
-    sql += ` AND timestamp <= $${params.length}`;
-  }
 
-  sql += ` ORDER BY timestamp ASC`;
+  res.json({ targetEntityId: target_id || 'SUB-00001', radiusMeters: radius, colocatedObservations: colocated });
+});
 
-  const rows = await db.query(sql, params);
-  const tracks = rows.map(o => ({
-    id: o.id,
-    entityId: o.entity_id,
-    caseId: o.case_id,
-    eventType: o.observation_type,
-    description: `${o.observation_type} ping at ${o.location_name}`,
-    timestamp: o.timestamp,
-    locationName: o.location_name,
-    latitude: o.latitude,
-    longitude: o.longitude,
-    confidence: o.confidence_score,
-    evidenceStatus: o.evidence_status,
-    evidenceRef: o.evidence_id,
-    rawData: o.raw_data ? JSON.parse(o.raw_data) : {}
-  }));
+// Spatio-Temporal Trajectory Route
+router.get('/trajectory', authenticateMiddleware, abacMiddleware('READ', async req => req.query.case_id || req.headers['x-case-id'] || 'CASE-SYN-0001'), async (req, res) => {
+  const { entity_id, case_id } = req.query;
+  const targetCaseId = case_id || req.headers['x-case-id'] || 'CASE-SYN-0001';
+  const entId = entity_id || 'SUB-00001';
 
-  await db.logAudit(req.user.id, req.user.name, 'QUERY_SPATIO_TEMPORAL', 'Geo Engine', `Queried ${tracks.length} spatio-temporal trajectory nodes for case ${targetCaseId}`, entityId || null, targetCaseId);
+  const waypoints = await db.query(
+    `SELECT id, timestamp, location_name, latitude, longitude, confidence_score 
+     FROM observations 
+     WHERE entity_id = $1 AND case_id = $2 
+     ORDER BY timestamp ASC`,
+    [entId, targetCaseId]
+  );
 
-  res.json({
-    tracks,
-    events: tracks
-  });
-};
-
-// Spatio-Temporal tracks & Leaflet map scrubber data (Case-scoped ABAC, PostGIS geometry)
-router.get('/tracks', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || 'CASE-SYN-0001'), handleTracksQuery);
-router.get('/trajectory', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || 'CASE-SYN-0001'), handleTracksQuery);
+  res.json({ entityId: entId, waypoints });
+});
 
 module.exports = router;

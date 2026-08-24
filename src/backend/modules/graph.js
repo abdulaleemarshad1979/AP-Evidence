@@ -6,10 +6,10 @@ const { abacMiddleware } = require('../middleware/abac');
 
 const handleGraphQuery = async (req, res) => {
   const { caseId, search, centerId } = req.query;
-  const targetCaseId = caseId || 'CASE-SYN-0001';
+  const targetCaseId = caseId || req.headers['x-case-id'] || 'CASE-SYN-0001';
 
   let entities = await db.getEntities({ search });
-  let assertionsRows = await db.query(`SELECT * FROM assertions`);
+  let assertionsRows = await db.query(`SELECT * FROM assertions WHERE case_id = $1`, [targetCaseId]);
 
   if (centerId) {
     const neighborIds = new Set([centerId]);
@@ -68,7 +68,7 @@ const handleGraphQuery = async (req, res) => {
 };
 
 // Knowledge Graph query endpoints
-router.get('/', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || 'CASE-SYN-0001'), handleGraphQuery);
-router.get('/network', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || 'CASE-SYN-0001'), handleGraphQuery);
+router.get('/', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || req.headers['x-case-id'] || 'CASE-SYN-0001'), handleGraphQuery);
+router.get('/network', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || req.headers['x-case-id'] || 'CASE-SYN-0001'), handleGraphQuery);
 
 module.exports = router;

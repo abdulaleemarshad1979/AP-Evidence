@@ -21,7 +21,8 @@ const uploadEvidenceSchema = z.object({
 // List evidence vault items (Case-scoped filtering)
 router.get('/', authenticateMiddleware, async (req, res) => {
   const { entityId, caseId } = req.query;
-  let evidenceList = await db.getEvidenceList({ caseId });
+  const targetCaseId = caseId || req.headers['x-case-id'] || 'CASE-SYN-0001';
+  let evidenceList = await db.getEvidenceList({ caseId: targetCaseId });
 
   if (entityId) {
     evidenceList = evidenceList.filter(ev => ev.associatedEntityIds && ev.associatedEntityIds.includes(entityId));
@@ -39,7 +40,7 @@ router.post('/upload', authenticateMiddleware, async (req, res) => {
 
   const user = req.user;
   const { title, mediaType, caseId, custodian, sourceDevice, parentEvidenceId, payloadData, associatedEntityIds } = parseResult.data;
-  const targetCaseId = caseId || 'CASE-SYN-0001';
+  const targetCaseId = caseId || req.headers['x-case-id'] || 'CASE-SYN-0001';
 
   // Decode buffer
   const buffer = Buffer.from(payloadData, 'base64');
@@ -104,7 +105,6 @@ router.get('/:id/verify', authenticateMiddleware, async (req, res) => {
   try {
     integrityRes = await storage.verifyIntegrity(objectKey, ev.sha256);
   } catch (err) {
-    // If object storage item missing or modified, return integrity verified false
     integrityRes = {
       integrityVerified: false,
       recomputedHash: 'OBJECT_NOT_FOUND',
@@ -126,7 +126,7 @@ router.get('/:id/verify', authenticateMiddleware, async (req, res) => {
 
   res.json({
     evidenceId: ev.id,
-    integrityVerified: integrityRes.integrityVerified,
+    integrityVerified: Boolean(integrityRes.integrityVerified),
     expectedSha256: ev.sha256,
     recomputedHash: integrityRes.recomputedHash,
     isOriginal: ev.isOriginal,
@@ -145,7 +145,7 @@ router.get('/export/:id', authenticateMiddleware, abacMiddleware('EXPORT_EVIDENC
   }
 
   const objectKey = ev.objectKey || `evidence/${ev.caseId}/${ev.id}`;
-  const integrityRes = await storage.verifyIntegrity(objectKey, ev.sha256).catch(() => ({ integrityVerified: true }));
+  const integrityRes = await storage.verifyIntegrity(objectKey, ev.sha256).catch(() => ({ integrityVerified: false }));
 
   const exportPayload = {
     evidence: ev,
@@ -153,7 +153,7 @@ router.get('/export/:id', authenticateMiddleware, abacMiddleware('EXPORT_EVIDENC
     exportedBy: req.user.username,
     integrityCheck: {
       serverSideHash: ev.sha256,
-      integrityVerified: integrityRes.integrityVerified,
+      integrityVerified: Boolean(integrityRes.integrityVerified),
       custodyEntriesCount: ev.chainOfCustody.length
     }
   };
@@ -195,11 +195,11 @@ router.get('/:id', authenticateMiddleware, async (req, res) => {
 
   const updatedEv = await db.getEvidenceById(req.params.id);
   const objectKey = updatedEv.objectKey || `evidence/${updatedEv.caseId}/${updatedEv.id}`;
-  const integrityRes = await storage.verifyIntegrity(objectKey, updatedEv.sha256).catch(() => ({ integrityVerified: true }));
+  const integrityRes = await storage.verifyIntegrity(objectKey, updatedEv.sha256).catch(() => ({ integrityVerified: false }));
 
   res.json({
     evidence: updatedEv,
-    integrityVerified: integrityRes.integrityVerified,
+    integrityVerified: Boolean(integrityRes.integrityVerified),
     serverSideHash: updatedEv.sha256,
     isOriginal: updatedEv.isOriginal,
     parentEvidenceId: updatedEv.parentEvidenceId

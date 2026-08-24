@@ -1,5 +1,6 @@
 const API = {
   activeToken: typeof localStorage !== 'undefined' ? (localStorage.getItem('jwt_token') || '') : '',
+  activeCaseId: typeof localStorage !== 'undefined' ? (localStorage.getItem('active_case_id') || 'CASE-SYN-0001') : 'CASE-SYN-0001',
 
   setToken(token) {
     this.activeToken = token;
@@ -8,6 +9,15 @@ const API = {
         localStorage.setItem('jwt_token', token);
       } else {
         localStorage.removeItem('jwt_token');
+      }
+    }
+  },
+
+  setCaseId(caseId) {
+    this.activeCaseId = caseId;
+    if (typeof localStorage !== 'undefined') {
+      if (caseId) {
+        localStorage.setItem('active_case_id', caseId);
       }
     }
   },
@@ -29,6 +39,9 @@ const API = {
       if (this.activeToken) {
         headers['Authorization'] = `Bearer ${this.activeToken}`;
       }
+      if (this.activeCaseId) {
+        headers['X-Case-ID'] = this.activeCaseId;
+      }
       const res = await fetch(`/api${endpoint}`, { headers });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ error: `HTTP Error ${res.status}` }));
@@ -46,6 +59,9 @@ const API = {
       const headers = { 'Content-Type': 'application/json' };
       if (this.activeToken) {
         headers['Authorization'] = `Bearer ${this.activeToken}`;
+      }
+      if (this.activeCaseId) {
+        headers['X-Case-ID'] = this.activeCaseId;
       }
       const res = await fetch(`/api${endpoint}`, {
         method: 'POST',

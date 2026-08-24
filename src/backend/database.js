@@ -20,7 +20,7 @@ class PostgreSQLDatabase {
     return crypto.createHash('sha256').update(content).digest('hex');
   }
 
-  async init(retries = 1, delayMs = 200) {
+  async init() {
     if (this.initialized) return;
 
     if (!fs.existsSync(DATA_DIR)) {
@@ -80,7 +80,9 @@ class PostgreSQLDatabase {
         `CREATE TABLE IF NOT EXISTS resolution_candidates (id VARCHAR(64) PRIMARY KEY, entity_a VARCHAR(64) NOT NULL, entity_b VARCHAR(64) NOT NULL, rule_version VARCHAR(64) NOT NULL, match_score DOUBLE PRECISION NOT NULL, compared_fields TEXT NOT NULL, individual_scores TEXT NOT NULL, conflicts TEXT, human_review_status VARCHAR(64) DEFAULT 'PENDING_REVIEW', review_priority VARCHAR(64) DEFAULT 'P1_HIGH', reviewer VARCHAR(128), decision_reason TEXT, status VARCHAR(64) DEFAULT 'PENDING_REVIEW', version INT DEFAULT 1 NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
         `CREATE TABLE IF NOT EXISTS merge_history (id VARCHAR(64) PRIMARY KEY, candidate_id VARCHAR(64) NOT NULL, primary_entity_id VARCHAR(64) NOT NULL, secondary_entity_id VARCHAR(64) NOT NULL, reviewer VARCHAR(128) NOT NULL, decision_reason TEXT NOT NULL, original_state_snapshot TEXT NOT NULL, action VARCHAR(64) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
         `CREATE TABLE IF NOT EXISTS audit_events (id VARCHAR(64) PRIMARY KEY, user_id VARCHAR(64) NOT NULL, username VARCHAR(128) NOT NULL, action VARCHAR(64) NOT NULL, module VARCHAR(64) NOT NULL, details TEXT NOT NULL, target_entity_id VARCHAR(64), case_id VARCHAR(64), timestamp TIMESTAMP NOT NULL, prev_hash VARCHAR(64) NOT NULL, hash VARCHAR(64) NOT NULL);`,
-        `CREATE TABLE IF NOT EXISTS outbox_events (id VARCHAR(64) PRIMARY KEY, aggregate_type VARCHAR(64) NOT NULL, aggregate_id VARCHAR(64) NOT NULL, event_type VARCHAR(64) NOT NULL, payload TEXT NOT NULL, status VARCHAR(64) DEFAULT 'PENDING', attempts INT DEFAULT 0, last_error TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, processed_at TIMESTAMP);`
+        `CREATE TABLE IF NOT EXISTS outbox_events (id VARCHAR(64) PRIMARY KEY, aggregate_type VARCHAR(64) NOT NULL, aggregate_id VARCHAR(64) NOT NULL, event_type VARCHAR(64) NOT NULL, payload TEXT NOT NULL, status VARCHAR(64) DEFAULT 'PENDING', attempts INT DEFAULT 0, last_error TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, processed_at TIMESTAMP);`,
+        `CREATE TABLE IF NOT EXISTS quarantine_records (id VARCHAR(64) PRIMARY KEY, source_connector VARCHAR(64) NOT NULL, raw_payload TEXT NOT NULL, payload_hash VARCHAR(64) NOT NULL, reason TEXT NOT NULL, status VARCHAR(64) DEFAULT 'QUARANTINED', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
+        `CREATE TABLE IF NOT EXISTS sensor_alerts (id VARCHAR(64) PRIMARY KEY, sensor_type VARCHAR(64) NOT NULL, severity VARCHAR(32) NOT NULL, case_id VARCHAR(64), entity_id VARCHAR(64), title VARCHAR(256) NOT NULL, description TEXT NOT NULL, status VARCHAR(32) DEFAULT 'UNACKNOWLEDGED', acknowledged_by VARCHAR(128), metadata TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
       ];
 
       for (const sql of tables) {
@@ -97,6 +99,21 @@ class PostgreSQLDatabase {
     }
 
     this.initialized = true;
+  }
+
+  async setSessionContext(client, user, caseId) {
+    if (!this.isPgMem && client && user) {
+      try {
+        await client.query(`SET LOCAL app.current_user_id = '${user.id}'`);
+        await client.query(`SET LOCAL app.current_user_role = '${user.role}'`);
+        await client.query(`SET LOCAL app.current_user_org = '${user.organization}'`);
+        if (caseId) {
+          await client.query(`SET LOCAL app.current_case_id = '${caseId}'`);
+        }
+      } catch (e) {
+        // Ignored in test fallback
+      }
+    }
   }
 
   async query(sql, params = []) {
@@ -372,6 +389,70 @@ class PostgreSQLDatabase {
   async getEvidenceById(id) {
     const list = await this.getEvidenceList();
     return list.find(e => e.id === id) || null;
+  }
+
+  // --- Phase 4 Repository Extensions ---
+  async saveQuarantineRecord(sourceConnector, rawPayload, reason) {
+    const id = `QUAR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const payloadStr = typeof rawPayload === 'string' ? rawPayload : JSON.stringify(rawPayload);
+    const payloadHash = PostgreSQLDatabase.sha256(payloadStr);
+
+    await this.execute(
+      `INSERT INTO quarantine_records (id, source_connector, raw_payload, payload_hash, reason, status)
+       VALUES ($1, $2, $3, $4, $5, 'QUARANTINED')`,
+      [id, sourceConnector, payloadStr, payloadHash, reason]
+    );
+    return id;
+  }
+
+  async createSensorAlert(alert) {
+    const id = `ALT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    await this.execute(
+      `INSERT INTO sensor_alerts (id, sensor_type, severity, case_id, entity_id, title, description, status, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'UNACKNOWLEDGED', $8)`,
+      [
+        id,
+        alert.sensorType,
+        alert.severity || 'HIGH',
+        alert.caseId || 'CASE-SYN-0001',
+        alert.entityId || null,
+        alert.title,
+        alert.description,
+        JSON.stringify(alert.metadata || {})
+      ]
+    );
+    return id;
+  }
+
+  async getSensorAlerts(caseId) {
+    let sql = `SELECT * FROM sensor_alerts WHERE 1=1`;
+    const params = [];
+    if (caseId) {
+      params.push(caseId);
+      sql += ` AND case_id = $${params.length}`;
+    }
+    sql += ` ORDER BY created_at DESC LIMIT 50`;
+    const rows = await this.query(sql, params);
+    return rows.map(r => ({
+      id: r.id,
+      sensorType: r.sensor_type,
+      severity: r.severity,
+      caseId: r.case_id,
+      entityId: r.entity_id,
+      title: r.title,
+      description: r.description,
+      status: r.status,
+      acknowledgedBy: r.acknowledged_by,
+      metadata: r.metadata ? JSON.parse(r.metadata) : {},
+      createdAt: r.created_at
+    }));
+  }
+
+  async acknowledgeSensorAlert(alertId, username) {
+    await this.execute(
+      `UPDATE sensor_alerts SET status = 'ACKNOWLEDGED', acknowledged_by = $1 WHERE id = $2`,
+      [username, alertId]
+    );
   }
 }
 

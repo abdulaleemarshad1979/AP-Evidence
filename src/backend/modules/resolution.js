@@ -210,4 +210,5 @@ const handleRunScan = async (req, res) => {
 router.post('/scan', authenticateMiddleware, abacMiddleware('MERGE', async () => 'CASE-SYN-0001'), handleRunScan);
 router.post('/run-scan', authenticateMiddleware, abacMiddleware('MERGE', async () => 'CASE-SYN-0001'), handleRunScan);
 
+router.compareEntities = compareEntities;
 module.exports = router;

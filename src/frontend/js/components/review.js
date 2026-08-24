@@ -11,7 +11,6 @@ const ReviewComponent = {
       const data = await API.get('/resolution/candidates');
       const candidates = data.candidates;
       const pending = candidates.filter(c => c.status === 'PENDING_REVIEW');
-      const merged = candidates.filter(c => c.status === 'APPROVED_MERGED');
 
       const badge = document.getElementById('nav-review-badge');
       if (badge) badge.innerText = pending.length;
@@ -23,7 +22,7 @@ const ReviewComponent = {
         return;
       }
 
-      // Render Pending Queue First
+      // Render Candidates Queue
       candidates.forEach(cand => {
         const card = document.createElement('div');
         card.className = 'card';
@@ -32,32 +31,32 @@ const ReviewComponent = {
         const eB = cand.entityBDetails || { id: cand.entityB, name: 'Synthetic Target B' };
         const scorePct = Math.round(cand.matchScore * 100);
 
-        const comparedFieldsStr = (cand.comparedFields || []).join(', ');
-        const scoresStr = JSON.stringify(cand.individualScores || {});
-        const conflictsStr = (cand.conflicts || []).map(c => `• Conflict on ${c.field}: ${c.valA} vs ${c.valB}`).join('<br>');
+        const comparedFieldsStr = API.escapeHTML((cand.comparedFields || []).join(', '));
+        const scoresStr = API.escapeHTML(JSON.stringify(cand.individualScores || {}));
+        const conflictsStr = (cand.conflicts || []).map(c => `• Conflict on ${API.escapeHTML(c.field)}: ${API.escapeHTML(c.valA)} vs ${API.escapeHTML(c.valB)}`).join('<br>');
 
         card.innerHTML = `
           <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-code-compare"></i> Candidate Pair #${cand.id} (Rule: <code>${cand.ruleVersion || 'v2.1'}</code>)</div>
-            <span class="badge-status ${cand.status === 'APPROVED_MERGED' ? 'badge-low' : (cand.status === 'REVERSED' ? 'badge-high' : 'badge-critical')}">${cand.status} (${scorePct}% MATCH)</span>
+            <div class="card-title"><i class="fa-solid fa-code-compare"></i> Candidate Pair #${API.escapeHTML(cand.id)} (Rule: <code>${API.escapeHTML(cand.ruleVersion || 'v2.2')}</code>)</div>
+            <span class="badge-status ${cand.status === 'APPROVED_MERGED' ? 'badge-low' : (cand.status === 'REVERSED' ? 'badge-high' : 'badge-critical')}">${API.escapeHTML(cand.status)} (${scorePct}% MATCH)</span>
           </div>
 
           <div class="comparison-container">
             <div class="comparison-box target">
-              <h4 style="color: var(--accent-cyan);">${eA.name}</h4>
-              <div class="mono" style="font-size: 0.8rem;">ID: ${eA.id} | Type: ${eA.type}</div>
+              <h4 style="color: var(--accent-cyan);">${API.escapeHTML(eA.name)}</h4>
+              <div class="mono" style="font-size: 0.8rem;">ID: ${API.escapeHTML(eA.id)} | Type: ${API.escapeHTML(eA.type)}</div>
               <div style="font-size: 0.85rem; margin-top: 0.5rem;">
-                Status: ${eA.evidenceStatus || 'VERIFIED_RAW'}<br>
-                Assertion Class: ${eA.assertionClass || 'CONFIRMED_FACT'}
+                Status: ${API.escapeHTML(eA.evidenceStatus || 'VERIFIED_RAW')}<br>
+                Assertion Class: ${API.escapeHTML(eA.assertionClass || 'CONFIRMED_FACT')}
               </div>
             </div>
 
             <div class="comparison-box">
-              <h4 style="color: var(--accent-amber);">${eB.name}</h4>
-              <div class="mono" style="font-size: 0.8rem;">ID: ${eB.id} | Type: ${eB.type}</div>
+              <h4 style="color: var(--accent-amber);">${API.escapeHTML(eB.name)}</h4>
+              <div class="mono" style="font-size: 0.8rem;">ID: ${API.escapeHTML(eB.id)} | Type: ${API.escapeHTML(eB.type)}</div>
               <div style="font-size: 0.85rem; margin-top: 0.5rem;">
-                Status: ${eB.evidenceStatus || 'DERIVED_ANALYSIS'}<br>
-                Assertion Class: ${eB.assertionClass || 'ALGORITHMIC_CANDIDATE'}
+                Status: ${API.escapeHTML(eB.evidenceStatus || 'DERIVED_ANALYSIS')}<br>
+                Assertion Class: ${API.escapeHTML(eB.assertionClass || 'ALGORITHMIC_CANDIDATE')}
               </div>
             </div>
           </div>
@@ -70,17 +69,17 @@ const ReviewComponent = {
 
           <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 0.5rem;">
             ${cand.status === 'PENDING_REVIEW' ? `
-              <button class="btn btn-danger btn-reject-merge" data-id="${cand.id}">
+              <button class="btn btn-danger btn-reject-merge" data-id="${API.escapeHTML(cand.id)}">
                 <i class="fa-solid fa-xmark"></i> Flag as Distinct (Reject)
               </button>
-              <button class="btn btn-primary btn-confirm-merge" data-id="${cand.id}" data-pa="${eA.id}" data-pb="${eB.id}">
+              <button class="btn btn-primary btn-confirm-merge" data-id="${API.escapeHTML(cand.id)}" data-pa="${API.escapeHTML(eA.id)}" data-pb="${API.escapeHTML(eB.id)}">
                 <i class="fa-solid fa-code-merge"></i> Confirm & Merge Records
               </button>
             ` : (cand.status === 'APPROVED_MERGED' ? `
-              <button class="btn btn-warning btn-reverse-merge" data-id="${cand.id}" data-pa="${eA.id}">
+              <button class="btn btn-warning btn-reverse-merge" data-id="${API.escapeHTML(cand.id)}" data-pa="${API.escapeHTML(eA.id)}">
                 <i class="fa-solid fa-rotate-left"></i> Reversible Merge (Unmerge / Split)
               </button>
-            ` : `<span style="color: var(--text-muted); font-size: 0.85rem;">Review Decision Finalized (${cand.status})</span>`)}
+            ` : `<span style="color: var(--text-muted); font-size: 0.85rem;">Review Decision Finalized (${API.escapeHTML(cand.status)})</span>`)}
           </div>
         `;
         container.appendChild(card);
@@ -89,7 +88,7 @@ const ReviewComponent = {
       this.bindCardEvents();
 
     } catch (err) {
-      container.innerHTML = `<div class="card">Failed to load review queue: ${err.message}</div>`;
+      container.innerHTML = `<div class="card">Failed to load review queue: ${API.escapeHTML(err.message)}</div>`;
     }
   },
 

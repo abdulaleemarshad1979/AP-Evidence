@@ -13,13 +13,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
+// Prometheus Metrics Counters
+let ingestionMetricsCount = 0;
+let totalHttpRequestCount = 0;
+
 // Security Headers & Helmet Configuration with Content Security Policy
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdnjs.cloudflare.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://*.tile.openstreetmap.org"],
       connectSrc: ["'self'"]
     }
@@ -31,12 +35,12 @@ app.use(helmet({
 app.use(cors({
   origin: CORS_ORIGIN,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-correlation-id']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-correlation-id', 'x-case-id']
 }));
 
 // Rate Limiting
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
@@ -44,8 +48,9 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// Correlation ID Middleware & Body Parsers
+// Request tracking & Correlation ID
 app.use((req, res, next) => {
+  totalHttpRequestCount++;
   const correlationId = req.headers['x-correlation-id'] || `corr-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
   req.correlationId = correlationId;
   res.setHeader('x-correlation-id', correlationId);
@@ -65,12 +70,22 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/ready', async (req, res) => {
   try {
+    if (db.isPgMem && process.env.NODE_ENV === 'production') {
+      return res.status(503).json({
+        status: 'NOT_READY',
+        database: 'FALLBACK_MEMORY_PG_MEM',
+        error: 'Real PostgreSQL 16 database unavailable in production mode',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     const dbTest = await db.queryOne(`SELECT 1 as alive`);
     if (!dbTest) throw new Error('Database ping returned empty');
+
     res.json({
       status: 'READY',
-      database: 'CONNECTED',
-      storage: 'READY',
+      database: db.isPgMem ? 'CONNECTED_PG_MEM_TEST' : 'CONNECTED_POSTGRES_16',
+      storage: storage.useS3 ? 'CONNECTED_MINIO_S3' : 'LOCAL_DISK_STORE',
       timestamp: new Date().toISOString()
     });
   } catch (err) {
@@ -82,6 +97,74 @@ app.get('/api/ready', async (req, res) => {
   }
 });
 
+// Prometheus System Metrics Endpoint
+app.get('/metrics', async (req, res) => {
+  const cases = await db.getCases();
+  const entities = await db.getEntities();
+  const pendingOutbox = await db.query(`SELECT COUNT(*) as count FROM outbox_events WHERE status = 'PENDING'`);
+  
+  res.set('Content-Type', 'text/plain');
+  res.send(`
+# HELP apis_http_requests_total Total number of HTTP requests handled
+# TYPE apis_http_requests_total counter
+apis_http_requests_total ${totalHttpRequestCount}
+
+# HELP apis_entities_total Total count of active entities
+# TYPE apis_entities_total gauge
+apis_entities_total ${entities.length}
+
+# HELP apis_cases_total Total count of active cases
+# TYPE apis_cases_total gauge
+apis_cases_total ${cases.length}
+
+# HELP apis_outbox_lag_pending Number of pending outbox events
+# TYPE apis_outbox_lag_pending gauge
+apis_outbox_lag_pending ${parseInt(pendingOutbox[0]?.count || 0, 10)}
+  `.trim());
+});
+
+// Global Categorized Search Endpoint (Defect 1.11 Remediation)
+app.get('/api/search', async (req, res) => {
+  const queryStr = String(req.query.q || req.query.query || '').trim().toLowerCase();
+  const caseId = req.query.caseId || req.headers['x-case-id'] || 'CASE-SYN-0001';
+
+  if (!queryStr) {
+    return res.json({ subjects: [], cases: [], evidence: [], observations: [] });
+  }
+
+  const allEntities = await db.getEntities();
+  const matchedEntities = allEntities.filter(e =>
+    e.name?.toLowerCase().includes(queryStr) ||
+    e.id.toLowerCase().includes(queryStr) ||
+    (e.aliases && e.aliases.some(a => a.toLowerCase().includes(queryStr)))
+  );
+
+  const allCases = await db.getCases();
+  const matchedCases = allCases.filter(c =>
+    c.title.toLowerCase().includes(queryStr) ||
+    c.id.toLowerCase().includes(queryStr) ||
+    c.codeName.toLowerCase().includes(queryStr)
+  );
+
+  const evidenceList = await db.getEvidenceList({ caseId });
+  const matchedEvidence = evidenceList.filter(ev =>
+    ev.title.toLowerCase().includes(queryStr) ||
+    ev.id.toLowerCase().includes(queryStr)
+  );
+
+  const obs = await db.query(
+    `SELECT * FROM observations WHERE case_id = $1 AND (LOWER(location_name) LIKE $2 OR LOWER(observation_type) LIKE $2) LIMIT 10`,
+    [caseId, `%${queryStr}%`]
+  );
+
+  res.json({
+    subjects: matchedEntities,
+    cases: matchedCases,
+    evidence: matchedEvidence,
+    observations: obs
+  });
+});
+
 app.get('/api/system/status', async (req, res) => {
   const cases = await db.getCases();
   const entities = await db.getEntities();
@@ -91,12 +174,12 @@ app.get('/api/system/status', async (req, res) => {
 
   res.json({
     system: 'Andhra Pradesh Intelligence System',
-    version: '3.0.0-PHASE-3-INVESTIGATOR-WORKSPACE',
-    status: 'PHASE_3_OPERATIONAL',
+    version: '4.0.0-PHASE-4-SECURE-INGESTION-GEOTEMPORAL',
+    status: 'PHASE_4_OPERATIONAL',
     classification: 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
-    databaseEngine: 'PostgreSQL 16 + PostGIS (Row-Level Security & Parameterized Queries)',
-    objectStorage: 'MinIO/S3-Compatible Evidence Vault',
-    authEngine: 'Keycloak/OIDC JWT Bearer Verification',
+    databaseEngine: db.isPgMem ? 'pg-mem (Unit-Test Fallback Engine)' : 'PostgreSQL 16 + PostGIS (Row-Level Security & Parameterized Queries)',
+    objectStorage: storage.useS3 ? 'MinIO/S3-Compatible Evidence Vault' : 'Local Disk Fallback Store',
+    authEngine: 'Keycloak OIDC Bearer Token Validation',
     dataset: {
       entities: entities.length,
       cases: cases.length,
@@ -119,6 +202,13 @@ app.use('/api/geospatial', require('./src/backend/modules/geospatial'));
 app.use('/api/evidence', require('./src/backend/modules/evidence'));
 app.use('/api/review', require('./src/backend/modules/review'));
 app.use('/api/audit', require('./src/backend/modules/audit'));
+app.use('/api/interop', require('./src/backend/modules/interop'));
+app.use('/api/alerts', require('./src/backend/modules/alerts'));
+
+// Phase 4 Ingestion Connectors Mount
+app.use('/api/ingest/cctv', require('./src/backend/connectors/cctv_connector'));
+app.use('/api/ingest/cdr', require('./src/backend/connectors/cdr_connector'));
+app.use('/api/ingest/telemetry', require('./src/backend/connectors/telemetry_connector'));
 
 // Fallback SPA route
 app.get('*', (req, res) => {
@@ -147,9 +237,9 @@ async function startServer() {
 
     app.listen(PORT, () => {
       console.log(`================================================================`);
-      console.log(` ANDHRA PRADESH INTELLIGENCE SYSTEM (Phase 3 Operational)`);
+      console.log(` ANDHRA PRADESH INTELLIGENCE SYSTEM (Phase 4 Operational)`);
       console.log(` Running on: http://localhost:${PORT}`);
-      console.log(` Database: PostgreSQL 16 + PostGIS`);
+      console.log(` Database: ${db.isPgMem ? 'pg-mem Unit Test Fallback' : 'PostgreSQL 16 + PostGIS'}`);
       console.log(` Classification: SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE`);
       console.log(`================================================================`);
     });

@@ -1,5 +1,5 @@
--- PostgreSQL 16 + PostGIS Schema Migration: Foundation Correction Pass 2
--- System: AP Spatio-Temporal Subject Intelligence Platform
+-- PostgreSQL 16 + PostGIS Schema Migration: Phase 3 Fixes & Phase 4 Expansion
+-- System: AP Spatio-Temporal Subject Intelligence Platform (APIS)
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 
@@ -232,6 +232,32 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     processed_at TIMESTAMP WITH TIME ZONE
 );
 
+-- 15. Phase 4 Quarantine Records Table
+CREATE TABLE IF NOT EXISTS quarantine_records (
+    id VARCHAR(64) PRIMARY KEY,
+    source_connector VARCHAR(64) NOT NULL,
+    raw_payload TEXT NOT NULL,
+    payload_hash VARCHAR(64) NOT NULL,
+    reason TEXT NOT NULL,
+    status VARCHAR(64) DEFAULT 'QUARANTINED' CHECK (status IN ('QUARANTINED', 'RELEASED', 'REJECTED')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 16. Phase 4 Real-time Sensor Alerts Table
+CREATE TABLE IF NOT EXISTS sensor_alerts (
+    id VARCHAR(64) PRIMARY KEY,
+    sensor_type VARCHAR(64) NOT NULL CHECK (sensor_type IN ('LPR_WATCHLIST', 'CDR_TRIANGULATION', 'FINANCIAL_ANOMALY', 'GEOSPATIAL_PROXIMITY')),
+    severity VARCHAR(32) NOT NULL CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+    case_id VARCHAR(64) REFERENCES cases(id) ON DELETE CASCADE,
+    entity_id VARCHAR(64) REFERENCES entities(id) ON DELETE CASCADE,
+    title VARCHAR(256) NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(32) DEFAULT 'UNACKNOWLEDGED' CHECK (status IN ('UNACKNOWLEDGED', 'ACKNOWLEDGED', 'DISMISSED')),
+    acknowledged_by VARCHAR(128),
+    metadata TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- INDEXES
 CREATE INDEX IF NOT EXISTS idx_observations_case_id ON observations(case_id);
 CREATE INDEX IF NOT EXISTS idx_observations_entity_id ON observations(entity_id);
@@ -245,6 +271,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_case_id ON audit_events(case_id);
 CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_events(status);
 CREATE INDEX IF NOT EXISTS idx_ingestion_rows_hash ON ingestion_rows(payload_hash);
+CREATE INDEX IF NOT EXISTS idx_alerts_case_status ON sensor_alerts(case_id, status);
 
 -- ROW LEVEL SECURITY (RLS) ENABLEMENT
 ALTER TABLE cases ENABLE ROW LEVEL SECURITY;
@@ -253,49 +280,73 @@ ALTER TABLE observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assertions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_metadata ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sensor_alerts ENABLE ROW LEVEL SECURITY;
 
--- Production Row-Level Security Policies (Filter based on app session context or case assignment)
+-- FAIL-CLOSED Row-Level Security Policies
+-- Requires active non-null app.current_user_id session variable
 DROP POLICY IF EXISTS app_cases_policy ON cases;
 CREATE POLICY app_cases_policy ON cases FOR ALL USING (
-    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
-    id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true)) OR
-    organization = current_setting('app.current_user_org', true) OR
-    current_setting('app.current_user_id', true) IS NULL OR
-    current_setting('app.current_user_id', true) = ''
+    NULLIF(current_setting('app.current_user_id', true), '') IS NOT NULL AND (
+      current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+      id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true)) OR
+      organization = current_setting('app.current_user_org', true)
+    )
 );
 
 DROP POLICY IF EXISTS app_entities_policy ON entities;
 CREATE POLICY app_entities_policy ON entities FOR ALL USING (
-    status != 'ARCHIVED' OR current_setting('app.current_user_role', true) = 'Admin'
+    NULLIF(current_setting('app.current_user_id', true), '') IS NOT NULL AND (
+      status != 'ARCHIVED' OR current_setting('app.current_user_role', true) = 'Admin'
+    )
 );
 
 DROP POLICY IF EXISTS app_obs_policy ON observations;
 CREATE POLICY app_obs_policy ON observations FOR ALL USING (
-    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
-    case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true)) OR
-    current_setting('app.current_user_id', true) IS NULL OR
-    current_setting('app.current_user_id', true) = ''
+    NULLIF(current_setting('app.current_user_id', true), '') IS NOT NULL AND (
+      current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+      case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true))
+    )
 );
 
 DROP POLICY IF EXISTS app_assertions_policy ON assertions;
 CREATE POLICY app_assertions_policy ON assertions FOR ALL USING (
-    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
-    case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true)) OR
-    current_setting('app.current_user_id', true) IS NULL OR
-    current_setting('app.current_user_id', true) = ''
+    NULLIF(current_setting('app.current_user_id', true), '') IS NOT NULL AND (
+      current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+      case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true))
+    )
 );
 
 DROP POLICY IF EXISTS app_evidence_policy ON evidence_metadata;
 CREATE POLICY app_evidence_policy ON evidence_metadata FOR ALL USING (
-    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
-    case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true)) OR
-    current_setting('app.current_user_id', true) IS NULL OR
-    current_setting('app.current_user_id', true) = ''
+    NULLIF(current_setting('app.current_user_id', true), '') IS NOT NULL AND (
+      current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+      case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true))
+    )
 );
 
 DROP POLICY IF EXISTS app_audit_policy ON audit_events;
 CREATE POLICY app_audit_policy ON audit_events FOR SELECT USING (
-    current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
-    current_setting('app.current_user_id', true) IS NULL OR
-    current_setting('app.current_user_id', true) = ''
+    NULLIF(current_setting('app.current_user_id', true), '') IS NOT NULL AND (
+      current_setting('app.current_user_role', true) IN ('Admin', 'Auditor')
+    )
 );
+
+DROP POLICY IF EXISTS app_alerts_policy ON sensor_alerts;
+CREATE POLICY app_alerts_policy ON sensor_alerts FOR ALL USING (
+    NULLIF(current_setting('app.current_user_id', true), '') IS NOT NULL AND (
+      current_setting('app.current_user_role', true) IN ('Admin', 'Auditor') OR
+      case_id IN (SELECT case_id FROM case_assignments WHERE user_id = current_setting('app.current_user_id', true))
+    )
+);
+
+-- Non-Superuser Database Application Role Setup
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'apis_app_user') THEN
+        CREATE ROLE apis_app_user WITH LOGIN PASSWORD 'apis_app_password_2026';
+    END IF;
+END
+$$;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO apis_app_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO apis_app_user;

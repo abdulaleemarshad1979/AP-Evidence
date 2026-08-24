@@ -5,7 +5,7 @@ const { authenticateMiddleware } = require('../middleware/auth');
 const { abacMiddleware } = require('../middleware/abac');
 
 // Search subjects endpoint
-router.get('/search', authenticateMiddleware, abacMiddleware('READ', async () => 'CASE-SYN-0001'), async (req, res) => {
+router.get('/search', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || req.headers['x-case-id'] || 'CASE-SYN-0001'), async (req, res) => {
   const queryStr = String(req.query.query || '').trim().toLowerCase();
   const allEntities = await db.getEntities();
 
@@ -25,10 +25,13 @@ router.get('/search', authenticateMiddleware, abacMiddleware('READ', async () =>
 
 // Get 360-degree timeline view for target entity (Case-scoped ABAC filter)
 router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
+  const targetCaseId = req.query.caseId || req.headers['x-case-id'];
+  if (targetCaseId) return targetCaseId;
   const obs = await db.queryOne(`SELECT case_id FROM observations WHERE entity_id = $1 LIMIT 1`, [req.params.id]);
   return obs ? obs.case_id : 'CASE-SYN-0001';
 }), async (req, res) => {
   const entityId = req.params.id;
+  const targetCaseId = req.query.caseId || req.headers['x-case-id'] || 'CASE-SYN-0001';
   const entity = await db.getEntityById(entityId);
 
   if (!entity) {
@@ -47,16 +50,16 @@ router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
   }
 
   const observationsRows = await db.query(
-    `SELECT * FROM observations WHERE entity_id = $1 ORDER BY timestamp DESC`,
-    [entityId]
+    `SELECT * FROM observations WHERE entity_id = $1 AND case_id = $2 ORDER BY timestamp DESC`,
+    [entityId, targetCaseId]
   );
   
   const assertionsRows = await db.query(
-    `SELECT * FROM assertions WHERE subject_entity_id = $1 OR object_entity_id = $1 ORDER BY created_at DESC`,
-    [entityId]
+    `SELECT * FROM assertions WHERE (subject_entity_id = $1 OR object_entity_id = $1) AND case_id = $2 ORDER BY created_at DESC`,
+    [entityId, targetCaseId]
   );
 
-  const evidenceRows = await db.getEvidenceList();
+  const evidenceRows = await db.getEvidenceList({ caseId: targetCaseId });
   const linkedEvidence = evidenceRows.filter(ev => ev.associatedEntityIds && ev.associatedEntityIds.includes(entityId));
 
   const allEntities = await db.getEntities();
@@ -96,7 +99,7 @@ router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
 
   const linkedEntities = Array.from(linkedEntityIds).map(id => entityMap.get(id) || { id, name: id, type: 'Entity' });
 
-  await db.logAudit(req.user.id, req.user.name, 'READ_SUBJECT_360', 'Subject 360', `Retrieved Subject 360 dossier for ${entityId}`, entityId, req.targetCase?.id);
+  await db.logAudit(req.user.id, req.user.name, 'READ_SUBJECT_360', 'Subject 360', `Retrieved Subject 360 dossier for ${entityId}`, entityId, targetCaseId);
 
   res.json({
     subject: entity,

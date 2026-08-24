@@ -20,7 +20,6 @@ async function generateSyntheticData(db) {
     await client.query(`DELETE FROM ingestion_batches`);
     await client.query(`DELETE FROM resolution_candidates`);
     await client.query(`DELETE FROM merge_history`);
-    await client.query(`DELETE FROM audit_events`);
     await client.query(`DELETE FROM outbox_events`);
 
     // 1. Users (ABAC Attributes)

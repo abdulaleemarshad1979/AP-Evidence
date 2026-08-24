@@ -1,10 +1,15 @@
 const API = {
-  activeUserId: 'USR-101',
-  activeToken: 'TOKEN-USR-101-INIT',
+  activeToken: typeof localStorage !== 'undefined' ? (localStorage.getItem('jwt_token') || '') : '',
 
-  setUserId(id) {
-    this.activeUserId = id;
-    this.activeToken = `TOKEN-${id}-${Date.now()}`;
+  setToken(token) {
+    this.activeToken = token;
+    if (typeof localStorage !== 'undefined') {
+      if (token) {
+        localStorage.setItem('jwt_token', token);
+      } else {
+        localStorage.removeItem('jwt_token');
+      }
+    }
   },
 
   // Safe HTML Escaping Helper to eliminate Stored-XSS risks
@@ -20,12 +25,11 @@ const API = {
 
   async get(endpoint) {
     try {
-      const res = await fetch(`/api${endpoint}`, {
-        headers: {
-          'Authorization': `Bearer ${this.activeToken}`,
-          'X-User-Id': this.activeUserId
-        }
-      });
+      const headers = {};
+      if (this.activeToken) {
+        headers['Authorization'] = `Bearer ${this.activeToken}`;
+      }
+      const res = await fetch(`/api${endpoint}`, { headers });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ error: `HTTP Error ${res.status}` }));
         throw new Error(errJson.message || errJson.error || `HTTP Error ${res.status}`);
@@ -39,13 +43,13 @@ const API = {
 
   async post(endpoint, data) {
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (this.activeToken) {
+        headers['Authorization'] = `Bearer ${this.activeToken}`;
+      }
       const res = await fetch(`/api${endpoint}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.activeToken}`,
-          'X-User-Id': this.activeUserId
-        },
+        headers,
         body: JSON.stringify(data)
       });
       if (!res.ok) {
@@ -59,3 +63,7 @@ const API = {
     }
   }
 };
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = API;
+}

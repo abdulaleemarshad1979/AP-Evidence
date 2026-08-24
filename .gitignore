@@ -1,3 +1,7 @@
 node_modules/
 *.log
 .DS_Store
+.env
+data/postgres_store.json
+data/object_store/
+data/audit_anchors.log

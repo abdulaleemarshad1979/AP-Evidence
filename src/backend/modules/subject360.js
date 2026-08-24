@@ -1,49 +1,74 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
-const { getContextUser } = require('../middleware/abac');
+const { authenticateMiddleware } = require('../middleware/auth');
+const { abacMiddleware } = require('../middleware/abac');
 
-// Search subjects / entities
-router.get('/search', (req, res) => {
-  const user = getContextUser(req);
-  const { query, type } = req.query;
-  const entities = db.getEntities({ search: query, type });
-  db.logAudit(user.id, user.name, 'SEARCH', 'Subject 360', `Searched synthetic entities with query: '${query || ''}'`);
-  res.json({ entities });
-});
+// Get 360-degree timeline view for target entity (Case-scoped ABAC filter)
+router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
+  const obs = await db.queryOne(`SELECT case_id FROM observations WHERE entity_id = $1 LIMIT 1`, [req.params.id]);
+  return obs ? obs.case_id : 'CASE-SYN-0001';
+}), async (req, res) => {
+  const entityId = req.params.id;
+  const entity = await db.getEntityById(entityId);
 
-// Get Subject 360 unified profile
-router.get('/:id', (req, res) => {
-  const user = getContextUser(req);
-  const subjectId = req.params.id;
-  const subject = db.getEntityById(subjectId);
-  if (!subject) {
-    return res.status(404).json({ error: 'Subject target entity not found' });
+  if (!entity) {
+    return res.status(404).json({ error: 'Subject entity not found' });
   }
 
-  // Linked assertions
-  const rels = db.relationships.filter(r => r.source === subjectId || r.target === subjectId);
-  const linkedIds = new Set();
-  rels.forEach(r => linkedIds.add(r.source === subjectId ? r.target : r.source));
+  // Handle canonical entity redirect if entity was merged
+  if (entity.status === 'MERGED' && entity.canonicalEntityId) {
+    const canonical = await db.getEntityById(entity.canonicalEntityId);
+    return res.json({
+      redirect: true,
+      canonicalEntityId: entity.canonicalEntityId,
+      message: `Entity ${entityId} was merged into canonical profile ${entity.canonicalEntityId}`,
+      entity: canonical
+    });
+  }
 
-  const linkedEntities = db.getEntities().filter(e => linkedIds.has(e.id));
-  const subjectEvents = db.events.filter(ev => ev.associatedEntityIds && ev.associatedEntityIds.includes(subjectId))
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const observationsRows = await db.query(
+    `SELECT * FROM observations WHERE entity_id = $1 ORDER BY timestamp DESC`,
+    [entityId]
+  );
+  
+  const assertionsRows = await db.query(
+    `SELECT * FROM assertions WHERE subject_entity_id = $1 OR object_entity_id = $1 ORDER BY created_at DESC`,
+    [entityId]
+  );
 
-  const linkedEvidence = db.evidence.filter(ev => ev.associatedEntityIds && ev.associatedEntityIds.includes(subjectId));
-  const linkedCases = db.getCases().filter(c => c.targetEntityIds && c.targetEntityIds.includes(subjectId));
-  const resolutions = db.resolutionCandidates.filter(rc => rc.entityA === subjectId || rc.entityB === subjectId);
+  const evidenceRows = await db.getEvidenceList();
+  const linkedEvidence = evidenceRows.filter(ev => ev.associatedEntityIds && ev.associatedEntityIds.includes(entityId));
 
-  db.logAudit(user.id, user.name, 'READ', 'Subject 360', `Loaded 360 synthetic profile for ${subject.name} (${subject.id})`, subject.id);
+  await db.logAudit(req.user.id, req.user.name, 'READ_SUBJECT_360', 'Subject 360', `Retrieved Subject 360 dossier for ${entityId}`, entityId, req.targetCase?.id);
 
   res.json({
-    subject,
-    relationships: rels,
-    linkedEntities,
-    events: subjectEvents,
-    evidence: linkedEvidence,
-    cases: linkedCases,
-    resolutions
+    subject: entity,
+    timeline: observationsRows.map(o => ({
+      id: o.id,
+      eventType: o.observation_type,
+      timestamp: o.timestamp,
+      locationName: o.location_name,
+      latitude: o.latitude,
+      longitude: o.longitude,
+      confidence: o.confidence_score,
+      evidenceStatus: o.evidence_status,
+      caseId: o.case_id,
+      rawData: o.raw_data ? JSON.parse(o.raw_data) : {},
+      evidenceRef: o.evidence_id
+    })),
+    relationships: assertionsRows.map(a => ({
+      id: a.id,
+      source: a.subject_entity_id,
+      target: a.object_entity_id,
+      caseId: a.case_id,
+      type: a.relation_type,
+      confidence: a.confidence_score,
+      confidenceMethod: a.confidence_method,
+      assertionClass: a.assertion_class,
+      evidenceRef: a.evidence_id
+    })),
+    evidenceVault: linkedEvidence
   });
 });
 

@@ -1,43 +1,51 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
-const { getContextUser, abacMiddleware } = require('../middleware/abac');
+const { authenticateMiddleware } = require('../middleware/auth');
+const { abacMiddleware } = require('../middleware/abac');
 
-// Get spatio-temporal event trajectory (ABAC Protected)
-router.get('/trajectory', abacMiddleware('READ', req => req.query.caseId || 'CASE-SYN-0001'), (req, res) => {
-  const user = req.user || getContextUser(req);
-  const { entityId, caseId } = req.query;
+// Spatio-Temporal tracks & Leaflet map scrubber data (Case-scoped ABAC, PostGIS geometry)
+router.get('/tracks', authenticateMiddleware, abacMiddleware('READ', async req => req.query.caseId || 'CASE-SYN-0001'), async (req, res) => {
+  const { caseId, entityId, startDate, endDate } = req.query;
+  const targetCaseId = caseId || 'CASE-SYN-0001';
 
-  let events = db.events;
+  let sql = `SELECT id, entity_id, case_id, observation_type, timestamp, location_name, latitude, longitude, confidence_score, evidence_status, raw_data, evidence_id FROM observations WHERE case_id = $1`;
+  const params = [targetCaseId];
 
   if (entityId) {
-    events = events.filter(ev => ev.associatedEntityIds && ev.associatedEntityIds.includes(entityId));
+    params.push(entityId);
+    sql += ` AND entity_id = $${params.length}`;
+  }
+  if (startDate) {
+    params.push(startDate);
+    sql += ` AND timestamp >= $${params.length}`;
+  }
+  if (endDate) {
+    params.push(endDate);
+    sql += ` AND timestamp <= $${params.length}`;
   }
 
-  if (caseId) {
-    events = events.filter(ev => ev.caseId === caseId);
-  }
+  sql += ` ORDER BY timestamp ASC`;
 
-  events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const rows = await db.query(sql, params);
+  const tracks = rows.map(o => ({
+    id: o.id,
+    entityId: o.entity_id,
+    caseId: o.case_id,
+    eventType: o.observation_type,
+    timestamp: o.timestamp,
+    locationName: o.location_name,
+    latitude: o.latitude,
+    longitude: o.longitude,
+    confidence: o.confidence_score,
+    evidenceStatus: o.evidence_status,
+    evidenceRef: o.evidence_id,
+    rawData: o.raw_data ? JSON.parse(o.raw_data) : {}
+  }));
 
-  const locations = db.getEntities({ type: 'Location' });
-  db.logAudit(user.id, user.name, 'SEARCH', 'Geospatial Scrubber', `Queried spatio-temporal trajectory (Target: ${entityId || 'ALL'}, Case: ${caseId || 'ALL'})`, entityId, caseId);
+  await db.logAudit(req.user.id, req.user.name, 'QUERY_SPATIO_TEMPORAL', 'Geo Engine', `Queried ${tracks.length} spatio-temporal trajectory nodes for case ${targetCaseId}`, entityId || null, targetCaseId);
 
-  res.json({
-    events,
-    locations,
-    trajectoryPoints: events.map(e => ({
-      id: e.id,
-      timestamp: e.timestamp,
-      lat: e.latitude,
-      lng: e.longitude,
-      locationName: e.locationName,
-      eventType: e.eventType,
-      description: e.description,
-      associatedEntityIds: e.associatedEntityIds,
-      confidence: e.confidence
-    }))
-  });
+  res.json({ tracks });
 });
 
 module.exports = router;

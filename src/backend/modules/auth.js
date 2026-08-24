@@ -1,9 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const { z } = require('zod');
 const db = require('../database');
-const { getContextUser } = require('../middleware/abac');
+const { signJwtToken, authenticateMiddleware } = require('../middleware/auth');
 
-// Synthetic passwords map for test accounts
+const loginSchema = z.object({
+  username: z.string().min(1, 'Username is required'),
+  password: z.string().min(1, 'Password is required')
+});
+
+// Synthetic user passwords mapping for dev/test credentials
 const SYNTHETIC_USER_PASSWORDS = {
   'analyst_lead': 'pass_lead_101',
   'case_manager': 'pass_mgr_102',
@@ -12,31 +18,34 @@ const SYNTHETIC_USER_PASSWORDS = {
   'unassigned_analyst': 'pass_foreign_105'
 };
 
-// Login Route with Password & Bearer Token Generation
-router.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  if (!username) {
-    return res.status(400).json({ error: 'Username is required' });
+// Login route returning signed OIDC JWT access tokens
+router.post('/login', async (req, res) => {
+  const parseResult = loginSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    return res.status(400).json({ error: 'Validation Error', details: parseResult.error.errors });
   }
 
-  const user = db.getUserByUsername(username);
+  const { username, password } = parseResult.data;
+
+  const user = await db.getUserByUsername(username);
   if (!user) {
     return res.status(401).json({ error: 'Invalid synthetic platform credentials' });
   }
 
-  // Password verification
-  const expectedPassword = SYNTHETIC_USER_PASSWORDS[username.toLowerCase()] || 'synthetic_pass';
-  if (password && password !== expectedPassword && password !== 'synthetic_pass') {
-    db.logAudit(user.id, user.username, 'LOGIN_FAILED', 'Auth', `Failed login attempt for user ${username}: invalid password`);
+  // Password verification - Never accept missing or universal passwords
+  const expectedPassword = SYNTHETIC_USER_PASSWORDS[username.toLowerCase()];
+  if (!expectedPassword || password !== expectedPassword) {
+    await db.logAudit(user.id, user.username, 'LOGIN_FAILED', 'Auth', `Failed login attempt for user ${username}: invalid password`);
     return res.status(401).json({ error: 'Invalid password credentials' });
   }
 
-  const token = `TOKEN-${user.id}-${Date.now()}`;
-  db.logAudit(user.id, user.name, 'USER_LOGIN', 'Auth', `Successful login for synthetic user ${user.username} (${user.role})`);
+  const token = signJwtToken(user);
+  await db.logAudit(user.id, user.name, 'USER_LOGIN', 'Auth', `Successful OIDC JWT login for user ${user.username} (${user.role})`);
 
   return res.json({
     token,
     tokenType: 'Bearer',
+    expiresIn: '8h',
     user: {
       id: user.id,
       username: user.username,
@@ -50,16 +59,17 @@ router.post('/login', (req, res) => {
   });
 });
 
-// Current user profile route (Bearer Header verified)
-router.get('/me', (req, res) => {
-  const user = getContextUser(req);
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized: invalid or missing Bearer token' });
-  }
-
+// Current user profile route
+router.get('/me', authenticateMiddleware, (req, res) => {
   res.json({
     user: {
-      ...user,
+      id: req.user.id,
+      username: req.user.username,
+      name: req.user.name,
+      role: req.user.role,
+      organization: req.user.organization,
+      jurisdiction: req.user.jurisdiction,
+      purposeClearance: req.user.purposeClearance,
       classification: 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE'
     }
   });

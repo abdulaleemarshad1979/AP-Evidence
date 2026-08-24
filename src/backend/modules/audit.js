@@ -1,76 +1,70 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../database');
 const crypto = require('crypto');
+const db = require('../database');
+const { authenticateMiddleware } = require('../middleware/auth');
+const { abacMiddleware } = require('../middleware/abac');
 
-function verifyAuditChain(logs) {
-  if (!logs || logs.length === 0) return { isValid: true, tamperedIndex: -1 };
+// List Audit Log events (Restricted strictly to Auditor & Admin roles)
+router.get('/logs', authenticateMiddleware, abacMiddleware('READ_AUDIT'), async (req, res) => {
+  const rows = await db.query(
+    `SELECT id, user_id as "userId", username, action, module, details, target_entity_id as "targetEntityId", case_id as "caseId", timestamp, prev_hash as "prevHash", hash FROM audit_events ORDER BY timestamp ASC`
+  );
+  res.json({ auditLogs: rows });
+});
 
-  for (let i = 0; i < logs.length; i++) {
-    const current = logs[i];
-    const expectedPrevHash = i === 0
-      ? '0000000000000000000000000000000000000000000000000000000000000000'
-      : logs[i - 1].hash;
+// Verify SHA-256 Cryptographic Hash Chain Integrity
+router.get('/verify', authenticateMiddleware, abacMiddleware('READ_AUDIT'), async (req, res) => {
+  const rows = await db.query(
+    `SELECT id, user_id, username, action, module, details, target_entity_id, case_id, timestamp, prev_hash, hash FROM audit_events ORDER BY timestamp ASC, id ASC`
+  );
 
-    if (current.prevHash !== expectedPrevHash) {
-      return { isValid: false, tamperedIndex: i, reason: `PrevHash mismatch at index ${i}` };
+  let chainValid = true;
+  let brokenIndex = -1;
+  let brokenLogId = null;
+
+  for (let i = 0; i < rows.length; i++) {
+    const log = rows[i];
+    const prevHash = i === 0 ? '0000000000000000000000000000000000000000000000000000000000000000' : rows[i - 1].hash;
+
+    // Verify link to previous entry
+    if (log.prev_hash !== prevHash) {
+      chainValid = false;
+      brokenIndex = i;
+      brokenLogId = log.id;
+      break;
     }
 
+    // Verify self hash signature
     const payloadStr = JSON.stringify({
-      userId: current.userId,
-      action: current.action,
-      moduleName: current.module,
-      details: current.details,
-      targetEntityId: current.targetEntityId || null,
-      caseId: current.caseId || null,
-      timestamp: current.timestamp,
-      prevHash: current.prevHash
+      userId: log.user_id,
+      action: log.action,
+      moduleName: log.module,
+      details: log.details,
+      targetEntityId: log.target_entity_id,
+      caseId: log.case_id,
+      timestamp: log.timestamp,
+      prevHash
     });
     const recomputedHash = crypto.createHash('sha256').update(payloadStr).digest('hex');
 
-    if (recomputedHash !== current.hash) {
-      return { isValid: false, tamperedIndex: i, reason: `Hash mismatch at index ${i}` };
+    if (recomputedHash !== log.hash) {
+      chainValid = false;
+      brokenIndex = i;
+      brokenLogId = log.id;
+      break;
     }
   }
 
-  return { isValid: true, tamperedIndex: -1 };
-}
-
-// Query Immutable Audit Ledger
-router.get('/', (req, res) => {
-  const { module: moduleFilter, user: userFilter, limit } = req.query;
-  let logs = db.auditLogs;
-
-  if (moduleFilter) {
-    logs = logs.filter(l => l.module.toLowerCase() === moduleFilter.toLowerCase());
-  }
-
-  if (userFilter) {
-    logs = logs.filter(l => l.username.toLowerCase().includes(userFilter.toLowerCase()));
-  }
-
-  const verification = verifyAuditChain(db.auditLogs);
+  await db.logAudit(req.user.id, req.user.name, 'VERIFY_AUDIT_LEDGER', 'Compliance Ledger', `Verified cryptographic hash chain of ${rows.length} log records: intact=${chainValid}`);
 
   res.json({
-    auditLogs: logs.slice().reverse(),
-    totalRecords: db.auditLogs.length,
-    isCryptographicChainValid: verification.isValid,
-    tamperedIndex: verification.tamperedIndex,
-    headHash: db.auditLogs.length > 0 ? db.auditLogs[db.auditLogs.length - 1].hash : null
-  });
-});
-
-// Explicit Tamper-Detection Verification API Endpoint
-router.get('/verify', (req, res) => {
-  const verification = verifyAuditChain(db.auditLogs);
-  res.json({
-    isCryptographicChainValid: verification.isValid,
-    tamperedIndex: verification.tamperedIndex,
-    totalRecords: db.auditLogs.length,
-    explanation: {
-      canProtect: 'Detects unauthorized modifications, reordering, or insertions within the event stream.',
-      cannotProtect: 'Cannot prevent direct database row deletion from tail without external timestamping anchors.'
-    }
+    totalLogs: rows.length,
+    chainValid,
+    brokenIndex,
+    brokenLogId,
+    verificationMethod: 'SHA-256 Append-Only Cryptographic Hash Chain',
+    externalAnchorLog: 'data/audit_anchors.log'
   });
 });
 

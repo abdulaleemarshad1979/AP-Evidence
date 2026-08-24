@@ -1,12 +1,13 @@
 {
   "name": "ap-spatio-temporal-intelligence-platform",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Production-grade Spatio-Temporal Intelligence Platform inspired by Palantir Gotham, Foundry, and AIP",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "seed": "node src/backend/seed.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node tests/run_tests.js"
   },
   "keywords": [
     "intelligence",
@@ -22,10 +23,16 @@
   "author": "Antigravity Engineering",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1116.0",
     "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
     "express": "^4.22.2",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.0",
     "pg-mem": "^3.0.14",
-    "sqlite3": "^6.0.1"
+    "sqlite3": "^6.0.1",
+    "zod": "^4.4.3"
   }
 }

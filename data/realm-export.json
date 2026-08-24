@@ -1,0 +1,61 @@
+{
+  "realm": "ap-intelligence",
+  "enabled": true,
+  "users": [
+    {
+      "username": "analyst_lead",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "pass_lead_101" }],
+      "attributes": {
+        "role": ["Analyst"],
+        "organization": ["ORG-ALPHA"],
+        "jurisdiction": ["JUR-UK"],
+        "purposeClearance": ["COUNTER_TERRORISM"]
+      }
+    },
+    {
+      "username": "case_manager",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "pass_mgr_102" }],
+      "attributes": {
+        "role": ["Case Manager"],
+        "organization": ["ORG-ALPHA"],
+        "jurisdiction": ["JUR-UK"],
+        "purposeClearance": ["COUNTER_TERRORISM"]
+      }
+    },
+    {
+      "username": "compliance_auditor",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "pass_audit_103" }],
+      "attributes": {
+        "role": ["Auditor"],
+        "organization": ["ORG-ALPHA"],
+        "jurisdiction": ["JUR-GLOBAL"],
+        "purposeClearance": ["AUDIT_OVERSIGHT"]
+      }
+    },
+    {
+      "username": "sys_admin",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "pass_admin_104" }],
+      "attributes": {
+        "role": ["Admin"],
+        "organization": ["ORG-ALPHA"],
+        "jurisdiction": ["JUR-GLOBAL"],
+        "purposeClearance": ["SYSTEM_ADMIN"]
+      }
+    },
+    {
+      "username": "unassigned_analyst",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "pass_foreign_105" }],
+      "attributes": {
+        "role": ["Analyst"],
+        "organization": ["ORG-BETA"],
+        "jurisdiction": ["JUR-US"],
+        "purposeClearance": ["CYBER_INTEL"]
+      }
+    }
+  ]
+}

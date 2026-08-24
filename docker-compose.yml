@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: ap_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: always
+
+  # Node.js Application Server
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ap_intelligence_app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/ap_evidence
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_BUCKET=ap-evidence-vault
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - JWT_SECRET=AP_INTELLIGENCE_PLATFORM_SECURE_JWT_SECRET_2026_PASS2
+      - KEYCLOAK_URL=http://keycloak:8080
+      - CORS_ORIGIN=*
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # PostgreSQL 16 + PostGIS Spatial Database
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: ap_postgis_db
+    environment:
+      POSTGRES_DB: ap_evidence
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ap_evidence"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MinIO S3-Compatible Object Storage for Evidence Vault
+  minio:
+    image: minio/minio:RELEASE.2024-01-31T02-03-41Z
+    container_name: ap_minio_storage
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: always
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Keycloak OIDC IAM Server (Dev Mode with Realm Export)
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: ap_keycloak_iam
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    restart: always
+
+volumes:
+  postgres_data:
+  minio_data:

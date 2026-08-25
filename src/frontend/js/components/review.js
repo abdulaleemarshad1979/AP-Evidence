@@ -27,8 +27,8 @@ const ReviewComponent = {
         const card = document.createElement('div');
         card.className = 'card';
 
-        const eA = cand.entityADetails || { id: cand.entityA, name: 'Synthetic Target A' };
-        const eB = cand.entityBDetails || { id: cand.entityB, name: 'Synthetic Target B' };
+        const eA = cand.entityADetails || { id: cand.entityA, name: 'Target Entity A' };
+        const eB = cand.entityBDetails || { id: cand.entityB, name: 'Target Entity B' };
         const scorePct = Math.round(cand.matchScore * 100);
 
         const comparedFieldsStr = API.escapeHTML((cand.comparedFields || []).join(', '));
@@ -142,7 +142,7 @@ const ReviewComponent = {
         try {
           await API.post('/review/reject', {
             candidateId: candId,
-            rationale: 'Analyst confirmed synthetic entities are distinct'
+            rationale: 'Analyst confirmed entities are distinct'
           });
           alert(`Flagged candidate pair ${candId} as distinct false positive`);
           await this.renderReviewCards();

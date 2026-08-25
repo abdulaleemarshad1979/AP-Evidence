@@ -67,13 +67,13 @@ router.post('/', authenticateMiddleware, abacMiddleware('CREATE_CASE'), async (r
   const user = req.user;
   const caseData = parseResult.data;
 
-  const id = `CASE-SYN-${Date.now().toString().slice(-4)}`;
-  const title = caseData.title.startsWith('Synthetic') ? caseData.title : `Synthetic Case ${caseData.title} (Fictional Operation)`;
-  const codeName = caseData.codeName || `CASE_SYN_${caseData.title.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+  const id = `CASE-AP-${Date.now().toString().slice(-4)}`;
+  const title = caseData.title;
+  const codeName = caseData.codeName || `CASE_OP_${caseData.title.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
   const organization = caseData.organization || user.organization || 'ORG-ALPHA';
   const jurisdiction = caseData.jurisdiction || user.jurisdiction || 'JUR-UK';
-  const classification = 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE';
-  const permittedPurposes = caseData.permittedPurposes || 'COUNTER_TERRORISM,TRAINING';
+  const classification = 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY';
+  const permittedPurposes = caseData.permittedPurposes || 'COUNTER_TERRORISM,LAW_ENFORCEMENT';
   const status = 'ACTIVE';
   const targetEntityIds = JSON.stringify(caseData.targetEntityIds || []);
 
@@ -81,7 +81,7 @@ router.post('/', authenticateMiddleware, abacMiddleware('CREATE_CASE'), async (r
     await client.query(
       `INSERT INTO cases (id, title, code_name, description, organization, jurisdiction, classification_level, permitted_purposes, status, target_entity_ids)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [id, title, codeName, caseData.description || 'Synthetic operation case', organization, jurisdiction, classification, permittedPurposes, status, targetEntityIds]
+      [id, title, codeName, caseData.description || 'Operational intelligence case file', organization, jurisdiction, classification, permittedPurposes, status, targetEntityIds]
     );
 
     await client.query(

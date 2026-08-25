@@ -1,6 +1,6 @@
 const API = {
   activeToken: typeof localStorage !== 'undefined' ? (localStorage.getItem('jwt_token') || '') : '',
-  activeCaseId: typeof localStorage !== 'undefined' ? (localStorage.getItem('active_case_id') || 'CASE-SYN-0001') : 'CASE-SYN-0001',
+  activeCaseId: typeof localStorage !== 'undefined' ? (localStorage.getItem('active_case_id') || '') : '',
 
   setToken(token) {
     this.activeToken = token;

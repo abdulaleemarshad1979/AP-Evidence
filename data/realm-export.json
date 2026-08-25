@@ -3,6 +3,28 @@
   "enabled": true,
   "users": [
     {
+      "username": "Admin",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "admin" }],
+      "attributes": {
+        "role": ["Admin"],
+        "organization": ["ORG-ALPHA"],
+        "jurisdiction": ["JUR-ALL"],
+        "purposeClearance": ["SYSTEM_ADMINISTRATION"]
+      }
+    },
+    {
+      "username": "user",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "user" }],
+      "attributes": {
+        "role": ["Analyst"],
+        "organization": ["ORG-ALPHA"],
+        "jurisdiction": ["JUR-AP"],
+        "purposeClearance": ["COUNTER_TERRORISM"]
+      }
+    },
+    {
       "username": "analyst_lead",
       "enabled": true,
       "credentials": [{ "type": "password", "value": "pass_lead_101" }],

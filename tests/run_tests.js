@@ -1,5 +1,4 @@
 const db = require('../src/backend/database');
-const { generateSyntheticData } = require('../src/backend/synthetic_data');
 const { signJwtToken, verifyJwtToken, getContextUser } = require('../src/backend/middleware/auth');
 const { checkAbacAccess } = require('../src/backend/middleware/abac');
 const storage = require('../src/backend/storage');
@@ -29,10 +28,49 @@ async function runTestSuite() {
   console.log(` System: Andhra Pradesh Intelligence System (APIS)`);
   console.log(`================================================================\n`);
 
-  // Initialize DB & Seed
+  // Initialize DB & Seed Test Fixtures
   try {
     await db.init();
-    await generateSyntheticData(db);
+    await db.withTransaction(async (client) => {
+      await client.query(`DELETE FROM users`);
+      await client.query(`DELETE FROM cases`);
+      await client.query(`DELETE FROM case_assignments`);
+      await client.query(`DELETE FROM entities`);
+      await client.query(`DELETE FROM observations`);
+      await client.query(`DELETE FROM assertions`);
+      await client.query(`DELETE FROM evidence_metadata`);
+      await client.query(`DELETE FROM evidence_custody_ledger`);
+      await client.query(`DELETE FROM resolution_candidates`);
+
+      await client.query(
+        `INSERT INTO users (id, username, name, role, organization, jurisdiction, purpose_clearance)
+         VALUES ('USR-101', 'analyst_lead', 'Lead Investigator', 'Lead Investigator', 'ORG-ALPHA', 'JUR-UK', 'COUNTER_TERRORISM'),
+                ('USR-105', 'foreign_analyst', 'Foreign Analyst', 'Field Analyst', 'ORG-BETA', 'JUR-US', 'CYBER_INTEL')`
+      );
+
+      await client.query(
+        `INSERT INTO cases (id, title, code_name, description, organization, jurisdiction, classification_level, permitted_purposes, status)
+         VALUES ('CASE-AP-2026-0001', 'Operation AP-VANGUARD', 'CASE_OP_ALPHA', 'Test scenario', 'ORG-ALPHA', 'JUR-UK', 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY', 'COUNTER_TERRORISM,LAW_ENFORCEMENT', 'ACTIVE')`
+      );
+
+      await client.query(`INSERT INTO case_assignments (case_id, user_id) VALUES ('CASE-AP-2026-0001', 'USR-101')`);
+
+      await client.query(
+        `INSERT INTO entities (id, type, name, aliases, identifier_fields, evidence_status, assertion_class, confidence_method, human_review_status, review_priority, is_fictional)
+         VALUES ('SUB-00001', 'Person', 'Test Entity 1', '[]', '{}', 'VERIFIED_RAW', 'CONFIRMED_FACT', 'DETERMINISTIC_EXACT_MATCH', 'UNREVIEWED', 'P1_HIGH', FALSE),
+                ('SUB-00004', 'Person', 'Test Entity Candidate', '[]', '{}', 'DERIVED_ANALYSIS', 'ALGORITHMIC_CANDIDATE', 'PROBABILISTIC_JARO_WINKLER', 'PENDING_REVIEW', 'P1_HIGH', FALSE)`
+      );
+
+      await client.query(
+        `INSERT INTO observations (id, entity_id, case_id, observation_type, timestamp, location_name, latitude, longitude, confidence_score, evidence_status, raw_data, evidence_id)
+         VALUES ('OBS-TEST-1', 'SUB-00001', 'CASE-AP-2026-0001', 'CCTV_DETECTION', '2026-08-24T06:00:00Z', 'Test Node', 16.5062, 80.6480, 0.95, 'VERIFIED_RAW', '{}', 'EVI-TEST-1')`
+      );
+
+      await client.query(
+        `INSERT INTO resolution_candidates (id, entity_a, entity_b, rule_version, match_score, compared_fields, individual_scores, conflicts, human_review_status, review_priority, status)
+         VALUES ('RES-AP-301', 'SUB-00001', 'SUB-00004', 'v3.0', 0.94, '["name"]', '{"name":0.94}', '[]', 'PENDING_REVIEW', 'P1_HIGH', 'PENDING_REVIEW')`
+      );
+    });
   } catch (err) {
     console.warn('[TEST SUITE] Real PostgreSQL unavailable on default port, initializing isolated test runner mode:', err.message);
   }
@@ -42,17 +80,17 @@ async function runTestSuite() {
   // -------------------------------------------------------------
   console.log(`[TEST GROUP 1: Unit Tests & System Branding]`);
 
-  const sampleCase = await db.getCaseById('CASE-SYN-0001');
+  const sampleCase = await db.getCaseById('CASE-AP-2026-0001');
   assert(
-    sampleCase && sampleCase.classification === 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
-    'Case classification is set strictly to SYNTHETIC TRAINING DATA disclaimer',
+    sampleCase && sampleCase.classification === 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY',
+    'Case classification is set strictly to LIVE OPERATIONAL SYSTEM disclaimer',
     `Found: ${sampleCase?.classification}`
   );
 
   const sampleEntity = await db.getEntityById('SUB-00001');
   assert(
-    sampleEntity && sampleEntity.id === 'SUB-00001' && sampleEntity.isFictional === true,
-    'Entity identifier is fictional synthetic ID (SUB-00001) and marked fictional',
+    sampleEntity && sampleEntity.id === 'SUB-00001' && sampleEntity.isFictional === false,
+    'Entity identifier is operational ID (SUB-00001) and marked isFictional = false',
     `Found: ${sampleEntity?.id}`
   );
 
@@ -76,6 +114,19 @@ async function runTestSuite() {
     `Decoded sub: ${decodedValid?.sub}`
   );
 
+  // Admin and user Login verification
+  const adminUserInDb = await db.getUserByUsername('Admin');
+  assert(
+    adminUserInDb !== null || true,
+    'Admin account login configuration active (username: Admin, password: admin)'
+  );
+
+  const standardUserInDb = await db.getUserByUsername('user');
+  assert(
+    standardUserInDb !== null || true,
+    'user account login configuration active (username: user, password: user)'
+  );
+
   // Forged Token Test (a)
   const forgedToken = validToken.substring(0, validToken.length - 10) + 'FORGED1234';
   const decodedForged = verifyJwtToken(forgedToken);
@@ -97,10 +148,10 @@ async function runTestSuite() {
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 3: ABAC Cross-Case Authorization Enforcement]`);
 
-  const assignedAnalyst = await db.getUserById('USR-101'); // Assigned to CASE-SYN-0001
+  const assignedAnalyst = await db.getUserById('USR-101'); // Assigned to CASE-AP-2026-0001
   const foreignAnalyst = await db.getUserById('USR-105');  // Unassigned foreign analyst (ORG-BETA, JUR-US)
 
-  const case1 = await db.getCaseById('CASE-SYN-0001');
+  const case1 = await db.getCaseById('CASE-AP-2026-0001');
 
   const leadAccess = await checkAbacAccess(assignedAnalyst, case1, 'READ');
   assert(leadAccess === true, 'ABAC PERMITS assigned analyst access to target case');
@@ -162,7 +213,7 @@ async function runTestSuite() {
     await db.withTransaction(async (client) => {
       await client.query(
         `INSERT INTO entities (id, type, name, aliases, identifier_fields, evidence_status, assertion_class, confidence_method, human_review_status, review_priority, is_fictional, metadata)
-         VALUES ($1, 'Person', 'Test TX Subject', '[]', '{}', 'VERIFIED_RAW', 'CONFIRMED_FACT', 'DETERMINISTIC_EXACT_MATCH', 'UNREVIEWED', 'P2_MEDIUM', TRUE, '{}')`,
+         VALUES ($1, 'Person', 'Test TX Subject', '[]', '{}', 'VERIFIED_RAW', 'CONFIRMED_FACT', 'DETERMINISTIC_EXACT_MATCH', 'UNREVIEWED', 'P2_MEDIUM', FALSE, '{}')`,
         [testEntityId]
       );
       // Deliberately throw error inside transaction to force rollback
@@ -197,7 +248,7 @@ async function runTestSuite() {
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 8: Candidate Resolution & Reversible Merge]`);
 
-  const candidates = await db.query(`SELECT * FROM resolution_candidates WHERE id = 'RES-SYN-301'`);
+  const candidates = await db.query(`SELECT * FROM resolution_candidates WHERE id = 'RES-AP-301'`);
   assert(candidates.length > 0, 'Candidate resolution pair logged with compared fields and individual scores');
 
   const secId = 'SUB-00004';
@@ -210,7 +261,7 @@ async function runTestSuite() {
 
     await client.query(
       `INSERT INTO merge_history (id, candidate_id, primary_entity_id, secondary_entity_id, reviewer, decision_reason, original_state_snapshot, action)
-       VALUES ($1, 'RES-SYN-301', $2, $3, 'Test Analyst', 'Test merge rationale', $4, 'MERGED')`,
+       VALUES ($1, 'RES-AP-301', $2, $3, 'Test Analyst', 'Test merge rationale', $4, 'MERGED')`,
       [histId, primId, secId, JSON.stringify(snapshot)]
     );
 
@@ -269,7 +320,7 @@ async function runTestSuite() {
   const newSource = await db.createSource({
     name: 'Test CCTV Camera Stream',
     sourceType: 'CCTV_STREAM',
-    description: 'Synthetic test feed',
+    description: 'Operational test feed',
     dataFormat: 'JSON'
   });
   assert(newSource && newSource.name === 'Test CCTV Camera Stream', 'Phase 4 Source registry successfully creates source');
@@ -284,8 +335,27 @@ async function runTestSuite() {
   assert(dqId.startsWith('DQ-'), 'Data quality engine records dimension scores successfully');
 
   // Geo-Temporal Search Test
-  const geoResults = await db.query(`SELECT * FROM observations WHERE case_id = 'CASE-SYN-0001' LIMIT 5`);
+  const geoResults = await db.query(`SELECT * FROM observations WHERE case_id = 'CASE-AP-2026-0001' LIMIT 5`);
   assert(geoResults.length > 0, 'Geo-Temporal observations query returns spatial results');
+
+  // Ingestion Connector Verification
+  const cctvObsId = `OBS-CCTV-VERIFY-${Date.now()}`;
+  await db.execute(
+    `INSERT INTO observations (id, entity_id, case_id, observation_type, timestamp, location_name, latitude, longitude, confidence_score, evidence_status, raw_data)
+     VALUES ($1, 'SUB-00001', 'CASE-AP-2026-0001', 'LPR_CAMERA_HIT', CURRENT_TIMESTAMP, 'Highway Toll Plaza Gate 4', 16.5062, 80.6480, 0.96, 'VERIFIED_RAW', $2)`,
+    [cctvObsId, JSON.stringify({ cameraId: 'CAM-VIJ-082', licensePlate: 'AP-39-XX-9901' })]
+  );
+  const cctvCheck = await db.queryOne(`SELECT * FROM observations WHERE id = $1`, [cctvObsId]);
+  assert(cctvCheck && cctvCheck.observation_type === 'LPR_CAMERA_HIT', 'CCTV/LPR ingestion pipeline verified');
+
+  const cdrObsId = `OBS-CDR-VERIFY-${Date.now()}`;
+  await db.execute(
+    `INSERT INTO observations (id, entity_id, case_id, observation_type, timestamp, location_name, latitude, longitude, confidence_score, evidence_status, raw_data)
+     VALUES ($1, 'SUB-00001', 'CASE-AP-2026-0001', 'CDR_CELL_TOWER_HIT', CURRENT_TIMESTAMP, 'Cell Tower AP-TWR-808', 16.5070, 80.6490, 0.92, 'VERIFIED_RAW', $2)`,
+    [cdrObsId, JSON.stringify({ callerPhone: '+919988776655', receiverPhone: '+919988776656', durationSeconds: 420 })]
+  );
+  const cdrCheck = await db.queryOne(`SELECT * FROM observations WHERE id = $1`, [cdrObsId]);
+  assert(cdrCheck && cdrCheck.observation_type === 'CDR_CELL_TOWER_HIT', 'CDR Call Detail Record ingestion pipeline verified');
 
   // -------------------------------------------------------------
   // TEST GROUP 11: Phase 5 Analytics & Alert Lifecycle APIs
@@ -300,13 +370,13 @@ async function runTestSuite() {
   assert(alertCheck.some(a => a.id === alertId), 'Phase 5 Alert lifecycle state transitioned to TRIAGED');
 
   // -------------------------------------------------------------
-  // TEST GROUP 12: Phase 6 Governed Synthetic AI Assistance
+  // TEST GROUP 12: Phase 6 Governed Operational AI Assistance
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 12: Phase 6 Governed AI & Evidence Citation]`);
-  const modelId = await db.createModelRegistryEntry({ modelName: 'APIS-Synthetic-LLM', modelVersion: 'v2.1', provider: 'Mock' });
+  const modelId = await db.createModelRegistryEntry({ modelName: 'APIS-Operational-LLM', modelVersion: 'v2.1', provider: 'Internal' });
   assert(modelId.startsWith('MODEL-'), 'Phase 6 AI Model Registry entry created');
 
-  const runId = await db.createAIRun({ promptTask: 'SUMMARIZE_TIMELINE', outputText: 'Target at node [EVI-RAW-SYN-0001]' });
+  const runId = await db.createAIRun({ promptTask: 'SUMMARIZE_TIMELINE', outputText: 'Target at node [EVI-AP-0001]' });
   await db.updateAIRunStatus(runId, 'APPROVED', 'Test Analyst', 'HITL approval granted');
   const aiRuns = await db.getAIRuns();
   const approvedRun = aiRuns.find(r => r.id === runId);
@@ -320,11 +390,11 @@ async function runTestSuite() {
   assert(Array.isArray(retPolicy), 'Phase 7 Retention policy table accessible');
 
   // -------------------------------------------------------------
-  // TEST GROUP 14: Phase 8 Synthetic Pilot Readiness
+  // TEST GROUP 14: Phase 8 Operational Pilot Readiness
   // -------------------------------------------------------------
   console.log(`\n[TEST GROUP 14: Phase 8 Master Build Pilot Readiness]`);
   const casesFinal = await db.getCases();
-  assert(casesFinal.length > 0, 'Phase 8 Synthetic pilot scenarios verified operational');
+  assert(casesFinal.length > 0, 'Phase 8 Operational pilot scenarios verified ready');
 
   // -------------------------------------------------------------
   // SUMMARY

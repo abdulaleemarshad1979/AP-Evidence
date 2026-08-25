@@ -425,7 +425,7 @@ class PostgreSQLDatabase {
         id,
         alert.sensorType,
         alert.severity || 'HIGH',
-        alert.caseId || 'CASE-SYN-0001',
+        alert.caseId || null,
         alert.entityId || null,
         alert.title,
         alert.description,
@@ -486,7 +486,7 @@ class PostgreSQLDatabase {
         src.sourceType,
         src.description || '',
         src.owner || 'System',
-        src.classification || 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
+        src.classification || 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY',
         src.dataFormat || 'JSON',
         src.schemaVersion || '1.0.0',
         src.enabled !== false,
@@ -514,7 +514,7 @@ class PostgreSQLDatabase {
       [
         id,
         job.sourceId || null,
-        job.jobType || 'SYNTHETIC_INGESTION',
+        job.jobType || 'LIVE_INGESTION',
         job.status || 'RUNNING',
         job.idempotencyKey || `key-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
         job.totalRecords || 0,
@@ -643,8 +643,8 @@ class PostgreSQLDatabase {
         alert.severity || 'HIGH',
         alert.status || 'NEW',
         alert.assignedTo || null,
-        alert.caseId || 'CASE-SYN-0001',
-        alert.subjectEntityId || 'SUB-00001',
+        alert.caseId || null,
+        alert.subjectEntityId || null,
         JSON.stringify(alert.matchedConditions || {}),
         JSON.stringify(alert.evidenceIds || []),
         alert.resolutionNotes || '',
@@ -680,12 +680,12 @@ class PostgreSQLDatabase {
         id,
         entry.modelName,
         entry.modelVersion,
-        entry.provider || 'Internal Synthetic AI Engine',
-        entry.intendedUse || 'Synthetic investigative lead generation',
+        entry.provider || 'Internal Intelligence AI Engine',
+        entry.intendedUse || 'Investigative lead generation',
         entry.prohibitedUse || 'Automated target scoring',
         entry.approvalStatus || 'APPROVED',
         entry.deploymentStatus || 'ACTIVE',
-        entry.knownLimitations || 'Synthetic mock evaluation engine'
+        entry.knownLimitations || 'Operational confidence scoring boundaries'
       ]
     );
     return id;
@@ -707,7 +707,7 @@ class PostgreSQLDatabase {
         id,
         run.promptTask,
         run.modelId || null,
-        run.caseId || 'CASE-SYN-0001',
+        run.caseId || null,
         JSON.stringify(run.inputParams || {}),
         run.outputText,
         JSON.stringify(run.citedEvidenceIds || []),

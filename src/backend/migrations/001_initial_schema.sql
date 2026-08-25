@@ -8,13 +8,16 @@ CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(64) PRIMARY KEY,
     username VARCHAR(64) UNIQUE NOT NULL,
     name VARCHAR(128) NOT NULL,
-    role VARCHAR(64) NOT NULL CHECK (role IN ('Analyst', 'Case Manager', 'Auditor', 'Admin')),
+    role VARCHAR(64) NOT NULL,
     organization VARCHAR(64) NOT NULL,
     jurisdiction VARCHAR(64) NOT NULL,
     purpose_clearance VARCHAR(64) NOT NULL,
     password_hash VARCHAR(256),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('Analyst', 'Case Manager', 'Auditor', 'Admin', 'Lead Investigator', 'Field Analyst'));
 
 -- 2. Cases Table
 CREATE TABLE IF NOT EXISTS cases (
@@ -24,7 +27,7 @@ CREATE TABLE IF NOT EXISTS cases (
     description TEXT,
     organization VARCHAR(64) NOT NULL,
     jurisdiction VARCHAR(64) NOT NULL,
-    classification_level VARCHAR(128) DEFAULT 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
+    classification_level VARCHAR(128) DEFAULT 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY',
     permitted_purposes TEXT NOT NULL,
     status VARCHAR(64) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'ARCHIVED', 'CLOSED')),
     target_entity_ids TEXT,
@@ -55,7 +58,7 @@ CREATE TABLE IF NOT EXISTS entities (
     status VARCHAR(64) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'MERGED', 'ARCHIVED')),
     canonical_entity_id VARCHAR(64) REFERENCES entities(id) ON DELETE SET NULL,
     version INT DEFAULT 1 NOT NULL,
-    is_fictional BOOLEAN DEFAULT TRUE,
+    is_fictional BOOLEAN DEFAULT FALSE,
     metadata TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -72,7 +75,7 @@ CREATE TABLE IF NOT EXISTS evidence_metadata (
     version_id VARCHAR(128),
     is_original BOOLEAN DEFAULT TRUE,
     parent_evidence_id VARCHAR(64) REFERENCES evidence_metadata(id) ON DELETE SET NULL,
-    classification VARCHAR(128) DEFAULT 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
+    classification VARCHAR(128) DEFAULT 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY',
     custodian VARCHAR(128) NOT NULL,
     source_device VARCHAR(128) NOT NULL,
     case_id VARCHAR(64) REFERENCES cases(id) ON DELETE CASCADE,

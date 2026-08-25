@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Andhra Pradesh Intelligence System (APIS) — Investigator Workspace</title>
+  <title>Palantir Enterprise Intelligence OS (Foundry, Gotham, AIP, Apollo)</title>
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   
   <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -24,217 +24,335 @@
   <!-- Top Header Bar -->
   <header class="top-header">
     <div class="brand-container">
-      <div class="brand-logo"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="brand-logo"><i class="fa-solid fa-cube"></i></div>
       <div class="brand-title">
-        ANDHRA PRADESH INTELLIGENCE SYSTEM <span>INVESTIGATOR WORKSPACE & SYSTEM OF RECORD</span>
+        PALANTIR ENTERPRISE INTELLIGENCE OS <span>FOUNDRY • GOTHAM • AIP • APOLLO</span>
       </div>
     </div>
 
-    <!-- Global Multi-Entity Search Field -->
+    <!-- Global Multi-Entity Command Bar (Ctrl + K) -->
     <div class="global-search-container">
       <i class="fa-solid fa-magnifying-glass search-icon"></i>
-      <input type="text" id="global-search-input" class="global-search-input" placeholder="Global Search (Entity ID, Name, Case, Hash)...">
+      <input type="text" id="global-search-input" class="global-search-input" placeholder="Search Entity, Case, Graph Node or Press Ctrl+K...">
+      <span class="cmd-k-badge">Ctrl + K</span>
     </div>
 
     <div class="header-status">
       <div class="active-case-pill" id="active-case-display">
         <span class="dot"></span>
-        <span id="current-case-title">CASE: CASE-SYN-0001</span>
+        <span id="current-case-title">OPERATIONAL SYSTEM READY</span>
       </div>
 
-      <div class="clearance-badge">
-        SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE
+      <div class="clearance-badge" id="header-clearance-badge">
+        CLEARANCE LEVEL 3 (LEAD INVESTIGATOR)
       </div>
 
       <div class="user-profile">
-        <i class="fa-solid fa-user-shield"></i>
+        <i class="fa-solid fa-user-shield" style="color: var(--accent-cyan);"></i>
         <select id="user-switcher" class="form-select user-select">
-          <option value="USR-101" selected>USR-101: Analyst Lead (ORG-ALPHA / JUR-UK)</option>
-          <option value="USR-102">USR-102: Case Manager (ORG-ALPHA / JUR-UK)</option>
-          <option value="USR-103">USR-103: Auditor (ORG-ALPHA / JUR-GLOBAL)</option>
-          <option value="USR-104">USR-104: System Admin (ORG-ALPHA / JUR-GLOBAL)</option>
-          <option value="USR-105">USR-105: Foreign Analyst (ORG-BETA / JUR-US - DENY TEST)</option>
+          <option value="USR-ADMIN">Admin: System Administrator (Admin / admin)</option>
+          <option value="USR-USER">user: Standard User (user / user)</option>
+          <option value="USR-101" selected>USR-101: Lead Investigator (Level 3 - Full Intel)</option>
+          <option value="USR-102">USR-102: Field Analyst (Level 2 - Masked Intel)</option>
+          <option value="USR-103">USR-103: Compliance Auditor (Level 1 - Audit Only)</option>
+          <option value="USR-104">USR-104: System Admin (Level 4 - Fleet & Governance)</option>
         </select>
+        <button class="btn btn-primary" id="btn-header-login-modal" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; margin-left: 0.5rem;">
+          <i class="fa-solid fa-right-to-bracket"></i> Login
+        </button>
       </div>
     </div>
   </header>
 
-  <!-- Navigation Bar -->
+  <!-- Platform Pillars & Navigation Bar -->
   <nav class="nav-bar">
-    <button class="nav-tab active" data-tab="cases">
-      <i class="fa-solid fa-folder-closed"></i> Case Workspace
-    </button>
-    <button class="nav-tab" data-tab="import">
-      <i class="fa-solid fa-file-import"></i> Data Import
-    </button>
-    <button class="nav-tab" data-tab="resolution">
-      <i class="fa-solid fa-object-group"></i> Entity Resolution <span class="badge" id="nav-res-badge">0</span>
-    </button>
-    <button class="nav-tab" data-tab="subject360">
-      <i class="fa-solid fa-user-check"></i> Subject 360
-    </button>
-    <button class="nav-tab" data-tab="graph">
-      <i class="fa-solid fa-diagram-project"></i> Knowledge Graph
-    </button>
-    <button class="nav-tab" data-tab="geospatial">
-      <i class="fa-solid fa-map-location-dot"></i> Map & Timeline
-    </button>
-    <button class="nav-tab" data-tab="evidence">
-      <i class="fa-solid fa-vault"></i> Evidence Locker
-    </button>
-    <button class="nav-tab" data-tab="review">
-      <i class="fa-solid fa-clipboard-check"></i> Human Review <span class="badge" id="nav-review-badge">0</span>
-    </button>
-    <button class="nav-tab" data-tab="audit">
-      <i class="fa-solid fa-shield-halved"></i> Audit Ledger
-    </button>
+    <div class="nav-pillar-group">
+      <span class="nav-pillar-tag">GOTHAM</span>
+      <button class="nav-tab active" data-tab="subject360">
+        <i class="fa-solid fa-user-check"></i> Subject 360 Workspace
+      </button>
+      <button class="nav-tab" data-tab="geospatial">
+        <i class="fa-solid fa-map-location-dot"></i> Spatio-Temporal C2 Map
+      </button>
+      <button class="nav-tab" data-tab="graph">
+        <i class="fa-solid fa-diagram-project"></i> Knowledge Graph ML
+      </button>
+      <button class="nav-tab" data-tab="cases">
+        <i class="fa-solid fa-folder-closed"></i> Cases
+      </button>
+      <button class="nav-tab" data-tab="evidence">
+        <i class="fa-solid fa-vault"></i> Evidence Vault
+      </button>
+    </div>
+
+    <div class="nav-pillar-group">
+      <span class="nav-pillar-tag">FOUNDRY</span>
+      <button class="nav-tab" data-tab="foundry">
+        <i class="fa-solid fa-cubes"></i> Dynamic Ontology Explorer
+      </button>
+      <button class="nav-tab" data-tab="resolution">
+        <i class="fa-solid fa-object-group"></i> Entity Resolution <span class="badge" id="nav-res-badge">1</span>
+      </button>
+      <button class="nav-tab" data-tab="import">
+        <i class="fa-solid fa-file-import"></i> Data Ingestion
+      </button>
+    </div>
+
+    <div class="nav-pillar-group">
+      <span class="nav-pillar-tag">AIP</span>
+      <button class="nav-tab" data-tab="aip">
+        <i class="fa-solid fa-brain"></i> Grounded AI Assistant
+      </button>
+      <button class="nav-tab" data-tab="review">
+        <i class="fa-solid fa-clipboard-check"></i> Governance Review <span class="badge" id="nav-review-badge">0</span>
+      </button>
+    </div>
+
+    <div class="nav-pillar-group" style="border-right: none;">
+      <span class="nav-pillar-tag" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-purple);">APOLLO</span>
+      <button class="nav-tab" data-tab="apollo">
+        <i class="fa-solid fa-server"></i> Fleet Control Plane
+      </button>
+      <button class="nav-tab" data-tab="audit">
+        <i class="fa-solid fa-shield-halved"></i> Audit Stream
+      </button>
+    </div>
   </nav>
 
   <!-- App Main Content Container -->
   <main class="app-container">
 
-    <!-- 1. Case Workspace Tab -->
-    <section id="tab-cases" class="tab-content active">
+    <!-- 1. Gotham: Subject 360 Workspace -->
+    <section id="tab-subject360" class="tab-content active">
+      <div class="grid-sidebar">
+        <!-- Subject Profile Panel -->
+        <div class="card" id="subject-profile-card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-id-card"></i> Subject Dossier</div>
+            <span class="badge-status badge-high" id="subject-clearance-tag">Clearance Level 3 Required</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.75rem; padding: 0.5rem 0;">
+            <img id="subject-photo" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" style="width: 90px; height: 90px; border-radius: 50%; border: 2px solid var(--accent-cyan); object-fit: cover; box-shadow: var(--shadow-glow);">
+            <div>
+              <h3 id="subject-name" style="font-size: 1.1rem; color: #ffffff;">No Subject Selected</h3>
+              <p id="subject-id" class="mono" style="font-size: 0.8rem; color: var(--accent-cyan); margin-top: 0.2rem;">Select or search an operational entity</p>
+            </div>
+          </div>
+
+          <div id="data-masking-warning" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-crimson); padding: 0.75rem; border-radius: 6px; font-size: 0.78rem; color: #FCA5A5;">
+            <i class="fa-solid fa-lock" style="margin-right: 0.4rem;"></i>
+            <strong>Need-To-Know Data Masked:</strong> Lower clearance session detected. Primary identifiers redacted.
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.825rem;">
+            <div><strong style="color: var(--text-muted);">Aliases:</strong> <span id="subject-aliases" class="mono">--</span></div>
+            <div><strong style="color: var(--text-muted);">Primary Phone:</strong> <span id="subject-phone" class="mono">--</span></div>
+            <div><strong style="color: var(--text-muted);">Registered Vehicle:</strong> <span id="subject-vehicle" class="mono">--</span></div>
+            <div><strong style="color: var(--text-muted);">Risk Score:</strong> <span id="subject-risk-score" class="mono" style="color: var(--accent-amber); font-weight: bold;">--</span></div>
+          </div>
+
+          <div style="border-top: 1px solid var(--border-color); pt: 0.75rem;">
+            <button class="btn btn-primary" id="btn-generate-aip-brief" style="width: 100%;">
+              <i class="fa-solid fa-brain"></i> Generate AIP Grounded Brief
+            </button>
+          </div>
+        </div>
+
+        <!-- Subject 360 Multi-View Workspace -->
+        <div class="card" style="display: flex; flex-direction: column; gap: 1rem;">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Spatio-Temporal Observation Timeline</div>
+            <span class="mono" style="font-size: 0.78rem; color: var(--accent-cyan);" id="obs-count-badge">5 Verified Events</span>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp (UTC)</th>
+                  <th>Sensor / Device</th>
+                  <th>Location / Coordinates</th>
+                  <th>Calculated Speed</th>
+                  <th>Confidence</th>
+                  <th>Anomaly Alert</th>
+                  <th>Evidence Ref</th>
+                </tr>
+              </thead>
+              <tbody id="subject-timeline-tbody">
+                <!-- Populated via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid-2" style="margin-top: 0.5rem;">
+            <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem; border-radius: 6px;">
+              <h4 style="font-size: 0.85rem; color: var(--accent-amber); margin-bottom: 0.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Path Velocity & Route Anomalies</h4>
+              <div id="subject-anomalies-list" style="font-size: 0.8rem; color: var(--text-muted);">
+                <!-- Populated via JavaScript -->
+              </div>
+            </div>
+
+            <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem; border-radius: 6px;">
+              <h4 style="font-size: 0.85rem; color: var(--accent-cyan); margin-bottom: 0.5rem;"><i class="fa-solid fa-people-arrows"></i> Co-Location Convergences (≤50m, ≤5m)</h4>
+              <div id="subject-colocations-list" style="font-size: 0.8rem; color: var(--text-muted);">
+                <!-- Populated via JavaScript -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Gotham: Spatio-Temporal C2 Map -->
+    <section id="tab-geospatial" class="tab-content">
+      <div style="position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; gap: 0.75rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: 6px;">
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="font-size: 0.9rem; font-weight: 700; color: #ffffff;"><i class="fa-solid fa-crosshairs" style="color: var(--accent-cyan);"></i> C2 SPATIO-TEMPORAL MAP ENGINE</span>
+            <span class="mono" style="font-size: 0.78rem; color: var(--accent-emerald);">● Live Leaflet Vector Stream</span>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn" id="btn-center-vijayawada"><i class="fa-solid fa-location-crosshairs"></i> Center Vijayawada</button>
+            <button class="btn" id="btn-center-visakhapatnam"><i class="fa-solid fa-anchor"></i> Center Visakhapatnam</button>
+          </div>
+        </div>
+
+        <div id="leaflet-map-container">
+          <!-- Leaflet Map Canvas -->
+        </div>
+
+        <!-- Chrono Playback Controller -->
+        <div class="timeline-scrubber">
+          <button class="btn btn-primary" id="btn-chrono-play"><i class="fa-solid fa-play"></i> Play</button>
+          <button class="btn" id="btn-chrono-step-prev"><i class="fa-solid fa-step-backward"></i> Prev</button>
+          <button class="btn" id="btn-chrono-step-next"><i class="fa-solid fa-step-forward"></i> Next</button>
+          <input type="range" id="chrono-slider" min="0" max="100" value="0">
+          <div class="scrubber-timestamp" id="scrubber-timestamp-display">2026-08-24 06:00:00 UTC</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Gotham: Knowledge Graph ML -->
+    <section id="tab-graph" class="tab-content">
       <div class="grid-sidebar">
         <div class="card">
           <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-folder-plus"></i> Initialize Case File</div>
+            <div class="card-title"><i class="fa-solid fa-sliders"></i> Graph Analytics & ML</div>
           </div>
-          <form id="create-case-form" style="display: flex; flex-direction: column; gap: 1rem;">
-            <div class="form-group">
-              <label class="form-label">Case Title</label>
-              <input type="text" id="case-title" class="form-input" placeholder="Operation Gamma" required>
+
+          <div class="form-group">
+            <label class="form-label">Center Focus Entity</label>
+            <select id="graph-center-select" class="form-select">
+              <option value="" disabled selected>Select Target Entity ID</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Multi-Hop Radius</label>
+            <select id="graph-hops-select" class="form-select">
+              <option value="1">1 Hop (Direct Links)</option>
+              <option value="2" selected>2 Hops (Expanded Network)</option>
+              <option value="3">3 Hops (Deep Cluster)</option>
+            </select>
+          </div>
+
+          <button class="btn btn-primary" id="btn-run-shortest-path" style="width: 100%;">
+            <i class="fa-solid fa-route"></i> Compute Shortest Path
+          </button>
+
+          <div style="border-top: 1px solid var(--border-color); pt: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+            <h4 style="font-size: 0.8rem; color: var(--accent-cyan);">Centrality Rankings</h4>
+            <div id="graph-centrality-list" style="font-size: 0.78rem;" class="mono">
+              <!-- Populated via JS -->
             </div>
-            <div class="form-group">
-              <label class="form-label">Code Name</label>
-              <input type="text" id="case-codename" class="form-input" placeholder="CASE_SYN_GAMMA">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Classification Markings</label>
-              <select id="case-classification" class="form-select" disabled>
-                <option value="SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE" selected>SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Review Priority</label>
-              <select id="case-threat" class="form-select">
-                <option value="P3_LOW">P3_LOW</option>
-                <option value="P2_MEDIUM" selected>P2_MEDIUM</option>
-                <option value="P1_HIGH">P1_HIGH</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Description</label>
-              <textarea id="case-desc" class="form-textarea" rows="3" placeholder="Synthetic operation summary..."></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Initialize Case</button>
-          </form>
+          </div>
         </div>
 
-        <div class="card">
+        <div class="card" style="display: flex; flex-direction: column; height: 100%;">
           <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-list-check"></i> Active Case Repository (ABAC Governed)</div>
+            <div class="card-title"><i class="fa-solid fa-diagram-project"></i> Force-Directed Entity Link Graph</div>
+            <span class="mono" style="font-size: 0.78rem; color: var(--accent-cyan);" id="graph-stats-badge">13 Nodes • 7 Edges</span>
           </div>
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Case ID</th>
-                  <th>Title</th>
-                  <th>Classification</th>
-                  <th>Priority</th>
-                  <th>Targets</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="cases-table-body">
-                <!-- Populated via JS -->
-              </tbody>
-            </table>
+          <div id="graph-canvas-container">
+            <!-- Cytoscape / D3 Force-Directed Canvas -->
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 2. Data Import Portal Tab -->
-    <section id="tab-import" class="tab-content">
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-cloud-arrow-up"></i> Ingestion Pipeline Engine</div>
-          </div>
-          <form id="ingest-form" style="display: flex; flex-direction: column; gap: 1rem;">
-            <div class="form-group">
-              <label class="form-label">Source Feed Name</label>
-              <input type="text" id="import-feed-name" class="form-input" value="AP Police Telemetry Feed" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Classification Markings</label>
-              <input type="text" class="form-input" value="SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE" disabled>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Raw Telemetry Records (JSON Array)</label>
-              <textarea id="import-json-payload" class="form-textarea mono" rows="10" placeholder='[{"eventType": "CCTV_DETECTION", "latitude": 51.5074, "longitude": -0.1478, "associatedEntityIds": ["SUB-00001"], "description": "AP sensor ping"}]'></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-bolt"></i> Execute Ingestion Pipeline</button>
-          </form>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Ingestion Batch Reconciliation</div>
-          </div>
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Batch ID</th>
-                  <th>Feed Name</th>
-                  <th>Accepted</th>
-                  <th>Quarantined</th>
-                  <th>Duplicates</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="import-history-table">
-                <!-- Populated via JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 3. Entity Resolution Workbench Tab -->
-    <section id="tab-resolution" class="tab-content">
-      <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
-          <div class="card-title"><i class="fa-solid fa-sliders"></i> Multi-Attribute Entity Disambiguation Engine</div>
-          <button id="btn-run-resolution" class="btn btn-primary"><i class="fa-solid fa-rotate"></i> Run Automated Resolution Scan</button>
-        </div>
-        <p style="font-size: 0.85rem; color: var(--text-muted);">
-          Rule version <code>v2.2-jaro-winkler-explainable</code>. Evaluates compared fields, per-attribute Jaro-Winkler confidence scores, and flags conflicts prior to analyst merge.
-        </p>
-      </div>
-
+    <!-- 4. Foundry: Dynamic Ontology Explorer -->
+    <section id="tab-foundry" class="tab-content">
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><i class="fa-solid fa-code-compare"></i> Resolution Candidate Pairs</div>
+          <div class="card-title"><i class="fa-solid fa-cubes"></i> PALANTIR FOUNDRY — DYNAMIC ONTOLOGY EXPLORER</div>
+          <span class="mono" style="font-size: 0.78rem; color: var(--accent-cyan);">Ontology Schema v3.4</span>
         </div>
+
+        <div class="grid-3" style="margin-bottom: 1rem;">
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem; border-radius: 6px;">
+            <h4 style="font-size: 0.85rem; color: var(--accent-cyan);"><i class="fa-solid fa-user"></i> Person Entity Type</h4>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">Canonical Person Objects with Jaro-Winkler resolution and provenance tags.</p>
+            <span class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">4 Registered Objects</span>
+          </div>
+
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem; border-radius: 6px;">
+            <h4 style="font-size: 0.85rem; color: var(--accent-amber);"><i class="fa-solid fa-car"></i> Vehicle Entity Type</h4>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">ANPR scanned license plates, VINs, and owner relationship links.</p>
+            <span class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">3 Registered Objects</span>
+          </div>
+
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem; border-radius: 6px;">
+            <h4 style="font-size: 0.85rem; color: var(--accent-purple);"><i class="fa-solid fa-phone"></i> Telecom & Bank Type</h4>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">MSISDN encrypted lines, IMSI, and SWIFT wire accounts.</p>
+            <span class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">3 Registered Objects</span>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Canonical Entity ID</th>
+                <th>Type</th>
+                <th>Primary Name</th>
+                <th>Identifiers & Aliases</th>
+                <th>Clearance Required</th>
+                <th>Data Provenance Source</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="foundry-ontology-tbody">
+              <!-- Populated via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Foundry: Entity Resolution Workbench -->
+    <section id="tab-resolution" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-object-group"></i> PALANTIR FOUNDRY — ENTITY RESOLUTION WORKBENCH</div>
+          <button class="btn btn-primary" id="btn-trigger-resolution-scan"><i class="fa-solid fa-wand-magic-sparkles"></i> Run Jaro-Winkler Scan</button>
+        </div>
+
         <div class="table-container">
           <table class="data-table">
             <thead>
               <tr>
                 <th>Candidate ID</th>
-                <th>Entity A</th>
-                <th>Entity B</th>
+                <th>Entity A (Primary)</th>
+                <th>Entity B (Candidate)</th>
                 <th>Match Score</th>
-                <th>Rule Version & Conflicts</th>
-                <th>Status</th>
+                <th>Compared Features</th>
+                <th>Conflicts</th>
+                <th>Human Decision</th>
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody id="resolution-candidates-table">
+            <tbody id="resolution-candidates-tbody">
               <!-- Populated via JS -->
             </tbody>
           </table>
@@ -242,135 +360,177 @@
       </div>
     </section>
 
-    <!-- 4. Subject 360 Operational Profile Tab -->
-    <section id="tab-subject360" class="tab-content">
-      <div class="card" style="margin-bottom: 1.5rem;">
-        <div style="display: flex; gap: 1rem; align-items: center;">
-          <input type="text" id="subject-search-input" class="form-input" placeholder="Search target subject (e.g. SUB-00001)..." style="flex: 1;">
-          <button id="btn-search-subject" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Search Subject</button>
-        </div>
-      </div>
-
-      <div id="subject-profile-container" class="grid-sidebar">
-        <!-- Sidebar Entity Card -->
-        <div class="card" id="subject-main-card">
+    <!-- 6. AIP: Grounded AI Assistant & Dossier Generator -->
+    <section id="tab-aip" class="tab-content">
+      <div class="grid-sidebar">
+        <div class="card">
           <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-id-card"></i> Target Profile</div>
-            <span class="badge-status badge-low" id="subj-review-status">VERIFIED_RAW</span>
+            <div class="card-title"><i class="fa-solid fa-brain"></i> AIP Tool Calling Engine</div>
           </div>
-          <div id="subj-profile-details" style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
-            <!-- Populated via JS -->
+
+          <div class="form-group">
+            <label class="form-label">AIP Prompt Task</label>
+            <select id="aip-task-select" class="form-select">
+              <option value="GENERATE_GROUNDED_BRIEF" selected>GENERATE_GROUNDED_BRIEF (Full Dossier)</option>
+              <option value="SUMMARIZE_TIMELINE">SUMMARIZE_TIMELINE (Key Sightings)</option>
+              <option value="EXPLAIN_PROXIMITY">EXPLAIN_PROXIMITY (Co-Location Verification)</option>
+              <option value="RECOMMEND_GAPS">RECOMMEND_GAPS (Coverage Gap Detection)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Target Subject ID</label>
+            <input type="text" id="aip-entity-input" class="form-input mono" placeholder="Enter Subject ID">
+          </div>
+
+          <button class="btn btn-primary" id="btn-execute-aip-run" style="width: 100%;">
+            <i class="fa-solid fa-play"></i> Execute AIP Intelligence Task
+          </button>
+
+          <div style="border-top: 1px solid var(--border-color); pt: 0.75rem;">
+            <h4 style="font-size: 0.8rem; color: var(--accent-cyan); margin-bottom: 0.4rem;">Grounded Safety Rules</h4>
+            <ul style="font-size: 0.75rem; color: var(--text-muted); padding-left: 1rem; display: flex; flex-direction: column; gap: 0.3rem;">
+              <li>Strict Evidence Citation policy [EVI-xxx] enforced.</li>
+              <li>Human-in-the-Loop review mandatory.</li>
+              <li>Graph RAG search bounds case scope.</li>
+            </ul>
           </div>
         </div>
 
-        <!-- Main Profile Tabs (Timeline, Linked Entities, Evidence) -->
-        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><i class="fa-solid fa-clock"></i> Spatio-Temporal Observation History</div>
-            </div>
-            <div class="table-container">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>Observation Type</th>
-                    <th>Location Node</th>
-                    <th>Confidence</th>
-                    <th>Evidence Status</th>
-                  </tr>
-                </thead>
-                <tbody id="subj-events-table">
-                  <!-- Populated via JS -->
-                </tbody>
-              </table>
-            </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-file-contract"></i> AIP Synthesized Operational Intelligence Brief</div>
+            <span class="mono" style="font-size: 0.78rem; color: var(--accent-emerald);" id="aip-confidence-tag">94% Grounded Confidence</span>
           </div>
 
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><i class="fa-solid fa-link"></i> Linked Assertions & Network</div>
-            </div>
-            <div class="table-container">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Entity ID</th>
-                    <th>Name / Identifier</th>
-                    <th>Type</th>
-                    <th>Relation</th>
-                    <th>Assertion Class</th>
-                  </tr>
-                </thead>
-                <tbody id="subj-links-table">
-                  <!-- Populated via JS -->
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <textarea id="aip-output-textbox" class="form-textarea mono" style="width: 100%; height: 420px; background: #05080E; color: var(--accent-cyan); line-height: 1.5; font-size: 0.825rem;" readonly>Click "Execute AIP Intelligence Task" to synthesize grounded operational brief...</textarea>
         </div>
       </div>
     </section>
 
-    <!-- 5. Knowledge Graph Tab -->
-    <section id="tab-graph" class="tab-content">
-      <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
-        <input type="text" id="graph-search-input" class="form-input" placeholder="Search node in network..." style="width: 300px;">
-        <button id="btn-graph-search" class="btn"><i class="fa-solid fa-magnifying-glass"></i> Filter Node</button>
-        <button id="btn-graph-reset" class="btn"><i class="fa-solid fa-rotate-left"></i> Reset Graph</button>
-        <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: auto;">
-          <i class="fa-solid fa-circle-info"></i> Drag nodes to reorganize layout. Click node to expand Subject 360 details.
-        </span>
-      </div>
-
-      <div id="graph-canvas-container">
-        <canvas id="graph-canvas"></canvas>
-      </div>
-    </section>
-
-    <!-- 6. Geospatial Map & Timeline Scrubber Tab -->
-    <section id="tab-geospatial" class="tab-content" style="position: relative; padding: 0;">
-      <div id="leaflet-map-container"></div>
-
-      <!-- Floating Timeline Scrubber Bar -->
-      <div class="timeline-scrubber">
-        <button id="btn-play-timeline" class="btn btn-primary" style="padding: 0.4rem 0.8rem;"><i class="fa-solid fa-play"></i></button>
-        <input type="range" id="timeline-slider" min="0" max="100" value="100">
-        <div class="scrubber-timestamp" id="scrubber-time-display">2026-08-24 07:10:00 UTC</div>
-        <select id="scrubber-speed" class="form-select" style="width: 80px; padding: 0.3rem;">
-          <option value="1">1x</option>
-          <option value="2">2x</option>
-          <option value="5">5x</option>
-        </select>
-      </div>
-    </section>
-
-    <!-- 7. Digital Evidence Vault Tab -->
-    <section id="tab-evidence" class="tab-content">
-      <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
-          <div class="card-title"><i class="fa-solid fa-vault"></i> Cryptographic Digital Evidence Vault</div>
-        </div>
-        <p style="font-size: 0.85rem; color: var(--text-muted);">
-          Distinguishes original versus derived evidence records. Computes server-side SHA-256 hashes and logs append-only chain of custody events.
-        </p>
-      </div>
-
+    <!-- 7. Apollo: Control Plane & Fleet Telemetry -->
+    <section id="tab-apollo" class="tab-content">
       <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-server"></i> PALANTIR APOLLO — PLATFORM CONTROL PLANE</div>
+          <span class="mono" style="font-size: 0.78rem; color: var(--accent-emerald);">● Fleet Deployment Healthy</span>
+        </div>
+
+        <div class="grid-3">
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1.25rem; border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">PostgreSQL 16 / PostGIS</span>
+              <span class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">ONLINE (4ms)</span>
+            </div>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.5rem;">Active Pool: 20 connections • Spatial RLS Enabled</p>
+          </div>
+
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1.25rem; border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">Graph Analytics Service</span>
+              <span class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">ONLINE (8ms)</span>
+            </div>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.5rem;">Betweenness & Degree Centrality Workers Ready</p>
+          </div>
+
+          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1.25rem; border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">AIP Grounded Engine</span>
+              <span class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">ONLINE (12ms)</span>
+            </div>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.5rem;">Citation Policy Guardrails Active</p>
+          </div>
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <h4 style="font-size: 0.9rem; color: var(--text-bright); margin-bottom: 0.75rem;"><i class="fa-solid fa-list-check"></i> System Pipeline Telemetry</h4>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Pipeline Name</th>
+                  <th>Source Connector</th>
+                  <th>Sync Status</th>
+                  <th>Records Processed</th>
+                  <th>Data Quality Score</th>
+                  <th>Retention Policy</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">CCTV-ANALYTICS-PIPELINE</td>
+                  <td>Vijayawada CCTV Radar Stream</td>
+                  <td><span class="badge-status badge-low">ACTIVE SYNC</span></td>
+                  <td class="mono">1,492,028</td>
+                  <td class="mono" style="color: var(--accent-emerald);">98.4% (EXCELLENT)</td>
+                  <td class="mono">30_DAYS</td>
+                </tr>
+                <tr>
+                  <td class="mono">ANPR-CORRIDOR-PIPELINE</td>
+                  <td>NH-16 ANPR Toll Gate Sensor</td>
+                  <td><span class="badge-status badge-low">ACTIVE SYNC</span></td>
+                  <td class="mono">849,102</td>
+                  <td class="mono" style="color: var(--accent-emerald);">99.1% (EXCELLENT)</td>
+                  <td class="mono">60_DAYS</td>
+                </tr>
+                <tr>
+                  <td class="mono">CDR-TRIANGULATION-FEED</td>
+                  <td>AP Telecom Tower Base Station</td>
+                  <td><span class="badge-status badge-low">ACTIVE SYNC</span></td>
+                  <td class="mono">4,192,800</td>
+                  <td class="mono" style="color: var(--accent-cyan);">96.5% (GOOD)</td>
+                  <td class="mono">90_DAYS</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. Additional Workspace Tabs (Cases, Evidence, Import, Review, Audit) -->
+    <section id="tab-cases" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-folder-closed"></i> Active Investigative Operations</div>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Case ID</th>
+                <th>Operation Title</th>
+                <th>Code Name</th>
+                <th>Classification</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="cases-tbody">
+              <!-- Populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-evidence" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-vault"></i> Cryptographic Evidence Vault</div>
+        </div>
         <div class="table-container">
           <table class="data-table">
             <thead>
               <tr>
                 <th>Evidence ID</th>
-                <th>Title / Payload Description</th>
-                <th>Type / Status</th>
-                <th>Original?</th>
-                <th>SHA-256 Hash</th>
+                <th>Title</th>
+                <th>Media Type</th>
+                <th>SHA-256 Stream Hash</th>
                 <th>Custodian</th>
-                <th>Action</th>
+                <th>Verification</th>
               </tr>
             </thead>
-            <tbody id="evidence-table-body">
+            <tbody id="evidence-tbody">
               <!-- Populated via JS -->
             </tbody>
           </table>
@@ -378,49 +538,45 @@
       </div>
     </section>
 
-    <!-- 8. Human Review Queue Tab -->
-    <section id="tab-review" class="tab-content">
-      <div class="card" style="margin-bottom: 1.5rem;">
+    <section id="tab-import" class="tab-content">
+      <div class="card">
         <div class="card-header">
-          <div class="card-title"><i class="fa-solid fa-user-shield"></i> Analyst Human-in-the-Loop Workbench</div>
+          <div class="card-title"><i class="fa-solid fa-file-import"></i> Secure Data Ingestion Pipeline</div>
         </div>
-        <p style="font-size: 0.85rem; color: var(--text-muted);">
-          Review candidate entity matches and execute merges or reversible splits with recorded snapshot history.
-        </p>
-      </div>
-
-      <div id="review-cards-container" style="display: flex; flex-direction: column; gap: 1.5rem;">
-        <!-- Populated via JS -->
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Ingest sensor telemetry, ANPR streams, and field reports into PostgreSQL with automated data quality checks and quarantine fallback.</p>
       </div>
     </section>
 
-    <!-- 9. Immutable Audit Ledger Tab -->
-    <section id="tab-audit" class="tab-content">
-      <div class="card" style="margin-bottom: 1.5rem;">
-        <div class="card-header">
-          <div class="card-title"><i class="fa-solid fa-shield-halved"></i> Cryptographically Verifiable Audit Ledger</div>
-          <span class="badge-status badge-low" id="audit-chain-status"><i class="fa-solid fa-check-double"></i> HASH CHAIN VERIFIED</span>
-        </div>
-        <p style="font-size: 0.85rem; color: var(--text-muted);">
-          Append-only log capturing all reads, searches, changes, reviews, exports, denied access, and administrative actions.
-        </p>
-      </div>
-
+    <section id="tab-review" class="tab-content">
       <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-clipboard-check"></i> Governance & AIP Review Queue</div>
+        </div>
+        <div id="review-queue-container" style="font-size: 0.85rem; color: var(--text-muted);">
+          No pending review items requiring analyst sign-off.
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-audit" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-shield-halved"></i> Immutable Security Audit Stream</div>
+          <span class="mono" style="font-size: 0.78rem; color: var(--accent-cyan);">SHA-256 Hash Chain Verified</span>
+        </div>
         <div class="table-container">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Log ID</th>
+                <th>Audit Event ID</th>
                 <th>Timestamp</th>
-                <th>Analyst</th>
+                <th>User / Operator</th>
                 <th>Action</th>
                 <th>Module</th>
-                <th>Details</th>
-                <th>Cryptographic Hash</th>
+                <th>SHA-256 Hash Signature</th>
               </tr>
             </thead>
-            <tbody id="audit-table-body">
+            <tbody id="audit-tbody">
               <!-- Populated via JS -->
             </tbody>
           </table>
@@ -430,34 +586,89 @@
 
   </main>
 
-  <!-- Evidence Detail Modal -->
-  <div class="modal-overlay" id="evidence-modal">
+  <!-- Command Palette Modal (Ctrl + K) -->
+  <div class="modal-overlay" id="cmd-palette-modal">
     <div class="modal-card">
-      <div class="card-header">
-        <div class="card-title" id="modal-ev-title">EVIDENCE DETAILS</div>
-        <button class="btn" id="btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+        <div class="card-title"><i class="fa-solid fa-terminal" style="color: var(--accent-cyan);"></i> Palantir Command Palette</div>
+        <span class="mono" style="font-size: 0.75rem; color: var(--text-muted);">ESC to Close</span>
       </div>
-      <div id="modal-ev-content" style="margin-top: 1rem; font-size: 0.85rem; display: flex; flex-direction: column; gap: 1rem;">
-        <!-- Populated via JS -->
+
+      <input type="text" id="cmd-palette-input" class="form-input" placeholder="Type a command or subject (e.g., Map, AIP, Apollo)..." style="width: 100%; margin-bottom: 1rem;">
+
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;" id="cmd-palette-results">
+        <button class="btn" onclick="app.switchTab('subject360'); app.closeCmdPalette();" style="justify-content: flex-start;">
+          <i class="fa-solid fa-user-check" style="color: var(--accent-cyan);"></i> Jump to Subject 360 Workspace
+        </button>
+        <button class="btn" onclick="app.switchTab('geospatial'); app.closeCmdPalette();" style="justify-content: flex-start;">
+          <i class="fa-solid fa-map-location-dot" style="color: var(--accent-emerald);"></i> Jump to Spatio-Temporal C2 Map
+        </button>
+        <button class="btn" onclick="app.switchTab('graph'); app.closeCmdPalette();" style="justify-content: flex-start;">
+          <i class="fa-solid fa-diagram-project" style="color: var(--accent-amber);"></i> Jump to Knowledge Graph ML
+        </button>
+        <button class="btn" onclick="app.switchTab('foundry'); app.closeCmdPalette();" style="justify-content: flex-start;">
+          <i class="fa-solid fa-cubes" style="color: var(--accent-blue);"></i> Jump to Foundry Dynamic Ontology Explorer
+        </button>
+        <button class="btn" onclick="app.switchTab('aip'); app.closeCmdPalette();" style="justify-content: flex-start;">
+          <i class="fa-solid fa-brain" style="color: var(--accent-cyan);"></i> Jump to AIP Grounded AI Brief Generator
+        </button>
+        <button class="btn" onclick="app.switchTab('apollo'); app.closeCmdPalette();" style="justify-content: flex-start;">
+          <i class="fa-solid fa-server" style="color: var(--accent-purple);"></i> Jump to Apollo Fleet Control Plane
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Login Modal -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal-card" style="max-width: 420px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+        <div class="card-title"><i class="fa-solid fa-user-lock" style="color: var(--accent-cyan);"></i> System Authentication</div>
+        <span class="mono" style="font-size: 0.75rem; color: var(--text-muted); cursor: pointer;" id="close-login-modal">ESC / Close</span>
+      </div>
 
-  <!-- App JavaScript Modules -->
+      <form id="login-form" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" id="login-username-input" class="form-input" placeholder="Enter username (Admin / user)" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="login-password-input" class="form-input" placeholder="Enter password (admin / user)" required>
+        </div>
+
+        <div id="login-error-msg" style="display: none; color: var(--accent-crimson); font-size: 0.8rem; background: rgba(239,68,68,0.1); padding: 0.5rem; border-radius: 4px;"></div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+          <i class="fa-solid fa-right-to-bracket"></i> Authenticate & Login
+        </button>
+
+        <div style="border-top: 1px solid var(--border-color); padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Quick Demo Login Accounts:</div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" class="btn" id="btn-quick-admin" style="flex: 1; font-size: 0.75rem; justify-content: center; background: var(--bg-panel);">
+              <i class="fa-solid fa-shield-halved" style="color: var(--accent-cyan);"></i> Admin / admin
+            </button>
+            <button type="button" class="btn" id="btn-quick-user" style="flex: 1; font-size: 0.75rem; justify-content: center; background: var(--bg-panel);">
+              <i class="fa-solid fa-user" style="color: var(--accent-emerald);"></i> user / user
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/js/api.js"></script>
-  <script src="/js/components/cases.js"></script>
-  <script src="/js/components/import.js"></script>
-  <script src="/js/components/resolution.js"></script>
-  <script src="/js/components/subject360.js"></script>
-  <script src="/js/components/graph.js"></script>
-  <script src="/js/components/map.js"></script>
-  <script src="/js/components/evidence.js"></script>
-  <script src="/js/components/review.js"></script>
-  <script src="/js/components/audit.js"></script>
   <script src="/js/app.js"></script>
+  <script src="/js/components/map.js"></script>
+  <script src="/js/components/graph.js"></script>
+  <script src="/js/components/subject360.js"></script>
+  <script src="/js/components/resolution.js"></script>
+  <script src="/js/components/cases.js"></script>
+  <script src="/js/components/evidence.js"></script>
 
 </body>
 </html>

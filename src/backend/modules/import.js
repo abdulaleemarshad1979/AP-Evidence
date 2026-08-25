@@ -75,8 +75,8 @@ router.get('/reconcile/:batchId', authenticateMiddleware, async (req, res) => {
   });
 });
 
-// Ingest structured synthetic raw data payload (Transactional, ABAC INGEST protection, Parameterized Queries)
-router.post('/ingest', authenticateMiddleware, abacMiddleware('INGEST', req => req.body.caseId || 'CASE-SYN-0001'), async (req, res) => {
+// Ingest structured raw data payload (Transactional, ABAC INGEST protection, Parameterized Queries)
+router.post('/ingest', authenticateMiddleware, abacMiddleware('INGEST', req => req.body.caseId || req.headers['x-case-id']), async (req, res) => {
   const parseResult = ingestBatchSchema.safeParse(req.body);
   if (!parseResult.success) {
     return res.status(400).json({ error: 'Validation Error', details: parseResult.error.errors });
@@ -84,9 +84,9 @@ router.post('/ingest', authenticateMiddleware, abacMiddleware('INGEST', req => r
 
   const user = req.user;
   const { sourceFeed, feedType, caseId, records } = parseResult.data;
-  const targetCaseId = caseId || 'CASE-SYN-0001';
+  const targetCaseId = caseId || req.headers['x-case-id'];
 
-  const importBatchId = `IMP-SYN-${Date.now()}`;
+  const importBatchId = `IMP-RAW-${Date.now()}`;
   const fullBatchHash = crypto.createHash('sha256').update(JSON.stringify(records)).digest('hex');
 
   let acceptedRecords = 0;
@@ -102,7 +102,7 @@ router.post('/ingest', authenticateMiddleware, abacMiddleware('INGEST', req => r
     await client.query(
       `INSERT INTO ingestion_batches (id, source_feed, feed_type, total_records, accepted_records, rejected_records, duplicate_records, quarantined_records, status, payload_hash, reconciliation_summary)
        VALUES ($1, $2, $3, $4, 0, 0, 0, 0, 'PROCESSING', $5, NULL)`,
-      [importBatchId, sourceFeed || 'Manual Synthetic Upload', feedType || 'MULTI_SOURCE', records.length, fullBatchHash]
+      [importBatchId, sourceFeed || 'Manual Operational Upload', feedType || 'MULTI_SOURCE', records.length, fullBatchHash]
     );
 
     for (let idx = 0; idx < records.length; idx++) {
@@ -164,29 +164,29 @@ router.post('/ingest', authenticateMiddleware, abacMiddleware('INGEST', req => r
 
       // 3. Accepted Record Processing
       const evId = `EVI-RAW-${importBatchId}-${idx}`;
-      const classification = 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE';
+      const classification = 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY';
 
       await client.query(
         `INSERT INTO evidence_metadata (id, title, media_type, file_size, sha256, is_original, parent_evidence_id, classification, custodian, source_device, case_id, evidence_status, human_review_status, review_priority, metadata)
          VALUES ($1, $2, 'JSON_PAYLOAD', $3, $4, TRUE, NULL, $5, 'Automated Ingestion Engine', $6, $7, 'VERIFIED_RAW', 'UNREVIEWED', 'P2_MEDIUM', $8)`,
-        [evId, `Synthetic Raw Telemetry Packet (${sourceFeed || 'Generic Feed'})`, `${rawPayloadStr.length} bytes`, rowHash, classification, sourceFeed || 'External Data Feed', targetCaseId, JSON.stringify({ associatedEntityIds: rec.associatedEntityIds || [] })]
+        [evId, `Live Raw Telemetry Packet (${sourceFeed || 'Generic Feed'})`, `${rawPayloadStr.length} bytes`, rowHash, classification, sourceFeed || 'External Data Feed', targetCaseId, JSON.stringify({ associatedEntityIds: rec.associatedEntityIds || [] })]
       );
 
       const custHash = crypto.createHash('sha256').update(`${evId}:INGESTED_AND_HASHED:${user.id}`).digest('hex');
       await client.query(
         `INSERT INTO evidence_custody_ledger (id, evidence_id, timestamp, user_id, username, action, notes, hash_signature)
-         VALUES ($1, $2, $3, $4, $5, 'INGESTED_AND_HASHED', 'Raw synthetic payload verified upon ingestion.', $6)`,
+         VALUES ($1, $2, $3, $4, $5, 'INGESTED_AND_HASHED', 'Raw live payload verified upon ingestion.', $6)`,
         [`CUST-${evId}`, evId, new Date().toISOString(), user.id, user.name, custHash]
       );
 
       // Create Observation with spatial PostGIS point
       const obsId = `OBS-IMP-${importBatchId}-${idx}`;
-      const entityId = (rec.associatedEntityIds && rec.associatedEntityIds.length > 0) ? rec.associatedEntityIds[0] : 'SUB-00001';
+      const entityId = (rec.associatedEntityIds && rec.associatedEntityIds.length > 0) ? rec.associatedEntityIds[0] : null;
       const eventType = rec.eventType || feedType || 'TELEMETRY_SIGNAL';
       const timestamp = rec.timestamp || new Date().toISOString();
-      const locName = rec.locationName || 'Ingested Synthetic Coordinate Node';
-      const latitude = isNaN(lat) ? 51.5074 : lat;
-      const longitude = isNaN(lng) ? -0.1478 : lng;
+      const locName = rec.locationName || 'Ingested Coordinate Node';
+      const latitude = isNaN(lat) ? 16.5062 : lat;
+      const longitude = isNaN(lng) ? 80.6480 : lng;
       const confidence = rec.confidence !== undefined ? parseFloat(rec.confidence) : 0.90;
 
       await client.query(
@@ -238,7 +238,7 @@ router.post('/ingest', authenticateMiddleware, abacMiddleware('INGEST', req => r
     message: 'Data batch processed with schema validation and idempotency checks',
     summary: {
       batchId: importBatchId,
-      sourceFeed: sourceFeed || 'Manual Synthetic Upload',
+      sourceFeed: sourceFeed || 'Manual Operational Upload',
       totalRecords: records.length,
       acceptedRecords,
       rejectedRecords,

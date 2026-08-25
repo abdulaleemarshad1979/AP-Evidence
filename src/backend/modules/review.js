@@ -47,7 +47,7 @@ router.post('/merge', authenticateMiddleware, abacMiddleware('MERGE', async req 
   if (!primary) return null;
   // Resolve case from primary entity's observations/assertions or fallback
   const obs = await db.queryOne(`SELECT case_id FROM observations WHERE entity_id = $1 LIMIT 1`, [primary.id]);
-  return obs ? obs.case_id : 'CASE-SYN-0001';
+  return obs ? obs.case_id : null;
 }), async (req, res) => {
   const parseResult = mergeSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -99,7 +99,7 @@ router.post('/merge', authenticateMiddleware, abacMiddleware('MERGE', async req 
     // 3. Update primary entity in DB (merge aliases, increment version)
     const mergedAliases = Array.from(new Set([...(primary.aliases || []), ...(secondary.aliases || []), secondary.name]));
     const primaryMeta = primary.metadata || {};
-    primaryMeta.notes = (primaryMeta.notes || '') + `\n[MERGED ${new Date().toISOString()}] Integrated synthetic data from ${secondary.id} (${secondary.name})`;
+    primaryMeta.notes = (primaryMeta.notes || '') + `\n[MERGED ${new Date().toISOString()}] Integrated operational data from ${secondary.id} (${secondary.name})`;
 
     await client.query(
       `UPDATE entities 
@@ -147,7 +147,7 @@ router.post('/merge', authenticateMiddleware, abacMiddleware('MERGE', async req 
 
 // Execute Reversible Merge / Split (Unmerge - Atomic Transaction)
 router.post('/reverse', authenticateMiddleware, abacMiddleware('REVERSE', async req => {
-  return 'CASE-SYN-0001';
+  return req.body.caseId || req.headers['x-case-id'] || null;
 }), async (req, res) => {
   const parseResult = reverseSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -235,7 +235,7 @@ router.post('/reverse', authenticateMiddleware, abacMiddleware('REVERSE', async 
 });
 
 // Reject Candidate Pair (Flag as Distinct / False Positive)
-router.post('/reject', authenticateMiddleware, abacMiddleware('MERGE', async () => 'CASE-SYN-0001'), async (req, res) => {
+router.post('/reject', authenticateMiddleware, abacMiddleware('MERGE', async req => req.body.caseId || req.headers['x-case-id'] || null), async (req, res) => {
   const parseResult = rejectSchema.safeParse(req.body);
   if (!parseResult.success) {
     return res.status(400).json({ error: 'Validation Error', details: parseResult.error.errors });
@@ -249,7 +249,7 @@ router.post('/reject', authenticateMiddleware, abacMiddleware('MERGE', async () 
     return res.status(404).json({ error: 'Candidate resolution record not found' });
   }
 
-  const reason = rationale || 'Analyst verified synthetic entities are distinct';
+  const reason = rationale || 'Analyst verified entities are distinct';
 
   await db.withTransaction(async (client) => {
     await client.query(

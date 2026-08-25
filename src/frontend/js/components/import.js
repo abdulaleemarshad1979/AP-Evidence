@@ -48,7 +48,7 @@ const ImportComponent = {
         try {
           const res = await API.post('/import/ingest', {
             sourceFeed: feedName,
-            feedType: 'SYNTHETIC_TELEMETRY',
+            feedType: 'LIVE_TELEMETRY',
             records
           });
           alert(`Ingestion Executed cleanly!\nAccepted: ${res.summary.acceptedRecords}\nQuarantined: ${res.summary.quarantinedRecords}\nDuplicates: ${res.summary.duplicateRecords}`);

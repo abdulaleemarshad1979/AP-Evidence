@@ -21,8 +21,8 @@ const uploadEvidenceSchema = z.object({
 // List evidence vault items (Case-scoped filtering)
 router.get('/', authenticateMiddleware, async (req, res) => {
   const { entityId, caseId } = req.query;
-  const targetCaseId = caseId || req.headers['x-case-id'] || 'CASE-SYN-0001';
-  let evidenceList = await db.getEvidenceList({ caseId: targetCaseId });
+  const targetCaseId = caseId || req.headers['x-case-id'];
+  let evidenceList = targetCaseId ? await db.getEvidenceList({ caseId: targetCaseId }) : await db.getEvidenceList({});
 
   if (entityId) {
     evidenceList = evidenceList.filter(ev => ev.associatedEntityIds && ev.associatedEntityIds.includes(entityId));
@@ -40,7 +40,7 @@ router.post('/upload', authenticateMiddleware, async (req, res) => {
 
   const user = req.user;
   const { title, mediaType, caseId, custodian, sourceDevice, parentEvidenceId, payloadData, associatedEntityIds } = parseResult.data;
-  const targetCaseId = caseId || req.headers['x-case-id'] || 'CASE-SYN-0001';
+  const targetCaseId = caseId || req.headers['x-case-id'];
 
   // Decode buffer
   const buffer = Buffer.from(payloadData, 'base64');
@@ -50,7 +50,7 @@ router.post('/upload', authenticateMiddleware, async (req, res) => {
   // Store in object store and get computed hash
   const storeRes = await storage.putObject(objectKey, buffer, mediaType || 'application/octet-stream');
 
-  const classification = 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE';
+  const classification = 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY';
   const isOriginal = !parentEvidenceId;
 
   await db.withTransaction(async (client) => {

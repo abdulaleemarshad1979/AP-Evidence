@@ -75,7 +75,7 @@ router.get('/ingestion/jobs', authenticateMiddleware, async (req, res) => {
 // --- 3. Upload & Ingestion Endpoint ---
 router.post('/ingestion/uploads', authenticateMiddleware, async (req, res) => {
   const { sourceId, fileName, payload, caseId } = req.body;
-  const targetCaseId = caseId || 'CASE-SYN-0001';
+  const targetCaseId = caseId || req.headers['x-case-id'];
 
   const jobId = await db.createIngestionJob({
     sourceId: sourceId || 'SRC-DEFAULT-CSV',
@@ -92,8 +92,8 @@ router.post('/ingestion/uploads', authenticateMiddleware, async (req, res) => {
 
   await db.execute(
     `INSERT INTO evidence_metadata (id, title, media_type, file_size, sha256, is_original, classification, custodian, source_device, case_id, evidence_status, human_review_status)
-     VALUES ($1, $2, $3, $4, $5, TRUE, 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE', $6, $7, $8, 'VERIFIED_RAW', 'UNREVIEWED')`,
-    [evId, fileName || 'Uploaded Synthetic Payload', 'SYNTHETIC_DATA', `${rawBytes.length} bytes`, sha256, req.user.username, sourceId || 'UPLOADER', targetCaseId]
+     VALUES ($1, $2, $3, $4, $5, TRUE, 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY', $6, $7, $8, 'VERIFIED_RAW', 'UNREVIEWED')`,
+    [evId, fileName || 'Uploaded Operational Payload', 'OPERATIONAL_DATA', `${rawBytes.length} bytes`, sha256, req.user.username, sourceId || 'UPLOADER', targetCaseId]
   );
 
   const custHash = crypto.createHash('sha256').update(`${evId}:INGESTED:${req.user.id}`).digest('hex');
@@ -128,14 +128,14 @@ router.post('/ingestion/uploads', authenticateMiddleware, async (req, res) => {
   });
 });
 
-// --- 4. Synthetic Stream Endpoint ---
-router.post('/ingestion/synthetic-stream', authenticateMiddleware, async (req, res) => {
+// --- 4. Stream Endpoint ---
+router.post('/ingestion/stream', authenticateMiddleware, async (req, res) => {
   const { streamName, records, caseId } = req.body;
   const recList = Array.isArray(records) ? records : [req.body];
-  const targetCaseId = caseId || 'CASE-SYN-0001';
+  const targetCaseId = caseId || req.headers['x-case-id'];
 
   const jobId = await db.createIngestionJob({
-    jobType: 'SYNTHETIC_STREAM',
+    jobType: 'LIVE_STREAM',
     status: 'COMPLETED',
     totalRecords: recList.length,
     processedRecords: recList.length,
@@ -145,15 +145,15 @@ router.post('/ingestion/synthetic-stream', authenticateMiddleware, async (req, r
   for (let i = 0; i < recList.length; i++) {
     const rec = recList[i];
     const obsId = `OBS-STRM-${Date.now()}-${i}`;
-    const lat = parseFloat(rec.latitude || 51.5074);
-    const lng = parseFloat(rec.longitude || -0.1478);
+    const lat = parseFloat(rec.latitude || 16.5062);
+    const lng = parseFloat(rec.longitude || 80.6480);
     const eventType = rec.eventType || streamName || 'STREAM_OBSERVATION';
     const timestamp = rec.timestamp || new Date().toISOString();
 
     await db.execute(
       `INSERT INTO observations (id, entity_id, case_id, observation_type, timestamp, location_name, latitude, longitude, location_geom, confidence_score, evidence_status, raw_data, evidence_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ST_SetSRID(ST_MakePoint($8, $7), 4326)::geography, $9, 'VERIFIED_RAW', $10, $11)`,
-      [obsId, rec.entityId || 'SUB-00001', targetCaseId, eventType, timestamp, rec.locationName || 'Synthetic Stream Marker', lat, lng, rec.confidence || 0.90, JSON.stringify(rec), 'EVI-RAW-SYN-0001']
+      [obsId, rec.entityId || null, targetCaseId || null, eventType, timestamp, rec.locationName || 'Stream Marker', lat, lng, rec.confidence || 0.90, JSON.stringify(rec), rec.evidenceId || null]
     );
   }
 
@@ -162,6 +162,12 @@ router.post('/ingestion/synthetic-stream', authenticateMiddleware, async (req, r
     jobId,
     recordsProcessed: recList.length
   });
+});
+
+// Compatibility alias for synthetic stream route
+router.post('/ingestion/synthetic-stream', (req, res, next) => {
+  req.url = '/ingestion/stream';
+  router.handle(req, res, next);
 });
 
 // --- 5. Evidence & Provenance Lineage APIs ---
@@ -288,7 +294,7 @@ router.post('/reconciliation/:id/decision', authenticateMiddleware, async (req, 
 
 // --- 9. Geo-Temporal Search API ---
 router.get('/geotemporal/search', authenticateMiddleware, async (req, res) => {
-  const caseId = req.query.caseId || 'CASE-SYN-0001';
+  const caseId = req.query.caseId || req.headers['x-case-id'];
   const lat = req.query.lat ? parseFloat(req.query.lat) : null;
   const lng = req.query.lng ? parseFloat(req.query.lng) : null;
   const radiusMeters = req.query.radius ? parseInt(req.query.radius, 10) : 5000;

@@ -126,7 +126,7 @@ apis_outbox_lag_pending ${parseInt(pendingOutbox[0]?.count || 0, 10)}
 // Global Categorized Search Endpoint (Defect 1.11 Remediation)
 app.get('/api/search', async (req, res) => {
   const queryStr = String(req.query.q || req.query.query || '').trim().toLowerCase();
-  const caseId = req.query.caseId || req.headers['x-case-id'] || 'CASE-SYN-0001';
+  const caseId = req.query.caseId || req.headers['x-case-id'] || 'CASE-AP-2026-0001';
 
   if (!queryStr) {
     return res.json({ subjects: [], cases: [], evidence: [], observations: [] });
@@ -176,7 +176,7 @@ app.get('/api/system/status', async (req, res) => {
     system: 'Andhra Pradesh Intelligence System',
     version: '4.0.0-PHASE-4-SECURE-INGESTION-GEOTEMPORAL',
     status: 'PHASE_4_OPERATIONAL',
-    classification: 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE',
+    classification: 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY',
     databaseEngine: db.isPgMem ? 'pg-mem (Unit-Test Fallback Engine)' : 'PostgreSQL 16 + PostGIS (Row-Level Security & Parameterized Queries)',
     objectStorage: storage.useS3 ? 'MinIO/S3-Compatible Evidence Vault' : 'Local Disk Fallback Store',
     authEngine: 'Keycloak OIDC Bearer Token Validation',
@@ -210,7 +210,10 @@ app.use('/api/v1', require('./src/backend/modules/phase8_routes'));
 app.use('/api/interop', require('./src/backend/modules/interop'));
 app.use('/api/alerts', require('./src/backend/modules/alerts'));
 
-// Phase 4 Ingestion Connectors Mount
+// Phase 4 Ingestion Connectors Mount (v1 & legacy route aliases)
+app.use('/api/v1/connectors/cctv', require('./src/backend/connectors/cctv_connector'));
+app.use('/api/v1/connectors/cdr', require('./src/backend/connectors/cdr_connector'));
+app.use('/api/v1/connectors/telemetry', require('./src/backend/connectors/telemetry_connector'));
 app.use('/api/ingest/cctv', require('./src/backend/connectors/cctv_connector'));
 app.use('/api/ingest/cdr', require('./src/backend/connectors/cdr_connector'));
 app.use('/api/ingest/telemetry', require('./src/backend/connectors/telemetry_connector'));
@@ -240,14 +243,32 @@ async function startServer() {
     // Start background outbox worker
     outboxWorker.start(5000);
 
-    app.listen(PORT, () => {
-      console.log(`================================================================`);
-      console.log(` ANDHRA PRADESH INTELLIGENCE SYSTEM (Phase 4 Operational)`);
-      console.log(` Running on: http://localhost:${PORT}`);
-      console.log(` Database: ${db.isPgMem ? 'pg-mem Unit Test Fallback' : 'PostgreSQL 16 + PostGIS'}`);
-      console.log(` Classification: SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE`);
-      console.log(`================================================================`);
-    });
+    const bindServer = (rawPort, maxAttempts = 10) => {
+      const portNum = parseInt(rawPort, 10);
+      return new Promise((resolve, reject) => {
+        const server = app.listen(portNum, () => {
+          console.log(`================================================================`);
+          console.log(` PALANTIR ENTERPRISE INTELLIGENCE OS (FOUNDRY, GOTHAM, AIP, APOLLO)`);
+          console.log(` Running on: http://localhost:${portNum}`);
+          console.log(` Database: ${db.isPgMem ? 'pg-mem Unit Test Fallback' : 'PostgreSQL 16 + PostGIS'}`);
+          console.log(` Classification: LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY`);
+          console.log(`================================================================`);
+          resolve({ server, port: portNum });
+        });
+
+        server.on('error', (err) => {
+          if (err.code === 'EADDRINUSE' && maxAttempts > 0) {
+            const nextPort = portNum + 1;
+            console.warn(`[PORT RECOVERY] Port ${portNum} in use, automatically selecting port ${nextPort}...`);
+            bindServer(nextPort, maxAttempts - 1).then(resolve).catch(reject);
+          } else {
+            reject(err);
+          }
+        });
+      });
+    };
+
+    await bindServer(PORT);
   } catch (err) {
     console.error('[FATAL SERVER ERROR] Fail Closed: Could not initialize database or server:', err.message);
     process.exit(1);

@@ -36,7 +36,7 @@ async function checkAbacAccess(user, targetCase, action) {
   }
 
   // 1. Classification check
-  if (targetCase.classification !== 'SYNTHETIC TRAINING DATA — NOT FOR OPERATIONAL USE') {
+  if (targetCase.classification !== 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY') {
     return false;
   }
 

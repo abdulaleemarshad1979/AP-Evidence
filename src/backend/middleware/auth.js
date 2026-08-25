@@ -26,14 +26,27 @@ function parseCookies(req) {
 }
 
 /**
- * Sign a JWT token with full claim set
+ * Get numerical clearance level for role
+ */
+function getClearanceLevel(role) {
+  if (role === 'Admin') return 4;
+  if (role === 'Lead Investigator') return 3;
+  if (role === 'Field Analyst' || role === 'Analyst' || role === 'Case Manager') return 2;
+  if (role === 'Auditor') return 1;
+  return 1;
+}
+
+/**
+ * Sign a JWT token with full claim set including clearance level
  */
 function signJwtToken(user) {
+  const clearanceLevel = getClearanceLevel(user.role);
   const payload = {
     sub: user.id,
     preferred_username: user.username,
     name: user.name,
     role: user.role,
+    clearance_level: clearanceLevel,
     organization: user.organization,
     jurisdiction: user.jurisdiction,
     purpose_clearance: user.purposeClearance
@@ -87,10 +100,45 @@ async function getContextUser(req) {
   const user = await db.getUserById(decoded.sub);
   if (!user) return null;
 
+  const clearanceLevel = getClearanceLevel(user.role);
   return {
     ...user,
+    clearanceLevel,
     jwtClaims: decoded
   };
+}
+
+/**
+ * Need-to-know Data Masking:
+ * If entity clearance > user clearance, automatically mask identifiers and sensitive fields
+ */
+function maskSubjectData(entity, userClearanceLevel = 2) {
+  if (!entity) return null;
+  const requiredClearance = entity.metadata?.clearanceRequired || entity.clearanceRequired || 2;
+  
+  if (userClearanceLevel < requiredClearance) {
+    const maskedId = entity.id.length > 3 ? `${entity.id.substring(0, 2)}-******` : '******';
+    return {
+      ...entity,
+      name: `CLASSIFIED SUBJECT (${maskedId})`,
+      aliases: ['[REDACTED ALIAS]'],
+      identifierFields: {
+        nationalId: '***-REDACTED-CLEARANCE-LEVEL-3-REQUIRED-***',
+        primaryPhone: '+91-XXXXX-XXXXX',
+        passportNo: 'SYN-XX-XXXXXX',
+        registeredVehicles: ['[REDACTED VEHICLE]']
+      },
+      metadata: {
+        ...(entity.metadata || {}),
+        primaryLocation: 'CLASSIFIED LOCATION [REDACTED]',
+        photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        dataMasked: true,
+        clearanceNotice: `Requires Clearance Level ${requiredClearance}. Session Clearance: Level ${userClearanceLevel}.`
+      },
+      isMasked: true
+    };
+  }
+  return entity;
 }
 
 /**
@@ -113,6 +161,8 @@ module.exports = {
   verifyJwtToken,
   getContextUser,
   authenticateMiddleware,
+  getClearanceLevel,
+  maskSubjectData,
   JWT_SECRET,
   JWT_ISSUER,
   JWT_AUDIENCE

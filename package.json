@@ -4,7 +4,7 @@
   "description": "Production-grade Spatio-Temporal Intelligence Platform inspired by Palantir Gotham, Foundry, and AIP",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "./start.sh",
     "seed": "node src/backend/seed.js",
     "dev": "node server.js",
     "test": "node tests/run_tests.js"

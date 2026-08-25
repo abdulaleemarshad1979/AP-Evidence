@@ -51,7 +51,7 @@ const CasesComponent = {
           await this.renderCasesTable();
           if (window.AuditComponent) window.AuditComponent.renderAuditTable();
         } catch (err) {
-          alert('Error creating synthetic case: ' + err.message);
+          alert('Error creating case: ' + err.message);
         }
       });
     }

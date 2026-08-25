@@ -196,6 +196,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.MapComponent = MapComponent;
   window.EvidenceComponent = EvidenceComponent;
   window.AuditComponent = AuditComponent;
+  if (typeof DocumentsComponent !== 'undefined') window.DocumentsComponent = DocumentsComponent;
+  if (typeof OntologyComponent !== 'undefined') window.OntologyComponent = OntologyComponent;
+  if (typeof LineageComponent !== 'undefined') window.LineageComponent = LineageComponent;
+  if (typeof AIPComponent !== 'undefined') window.AIPComponent = AIPComponent;
+  if (typeof WorkbookComponent !== 'undefined') window.WorkbookComponent = WorkbookComponent;
+  if (typeof WorkshopComponent !== 'undefined') window.WorkshopComponent = WorkshopComponent;
 
   // Initialize Core Components
   await Subject360Component.init();

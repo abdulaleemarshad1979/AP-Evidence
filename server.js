@@ -174,8 +174,8 @@ app.get('/api/system/status', async (req, res) => {
 
   res.json({
     system: 'Andhra Pradesh Intelligence System',
-    version: '4.0.0-PHASE-4-SECURE-INGESTION-GEOTEMPORAL',
-    status: 'PHASE_4_OPERATIONAL',
+    version: '6.0.0-PHASE-10-ONTOLOGY-WORKSHOP',
+    status: 'PHASE_10_OPERATIONAL',
     classification: 'LIVE OPERATIONAL SYSTEM — RESTRICTED / OFFICIAL USE ONLY',
     databaseEngine: db.isPgMem ? 'pg-mem (Unit-Test Fallback Engine)' : 'PostgreSQL 16 + PostGIS (Row-Level Security & Parameterized Queries)',
     objectStorage: storage.useS3 ? 'MinIO/S3-Compatible Evidence Vault' : 'Local Disk Fallback Store',
@@ -210,10 +210,18 @@ app.use('/api/v1', require('./src/backend/modules/phase8_routes'));
 app.use('/api/interop', require('./src/backend/modules/interop'));
 app.use('/api/alerts', require('./src/backend/modules/alerts'));
 
-// Phase 4 Ingestion Connectors Mount (v1 & legacy route aliases)
+// Phase 10 Foundry Parity Modules Mount
+app.use('/api/ontology', require('./src/backend/modules/ontology'));
+app.use('/api/lineage', require('./src/backend/modules/lineage'));
+app.use('/api/workbook', require('./src/backend/modules/workbook'));
+app.use('/api/workshop', require('./src/backend/modules/workshop'));
+app.use('/api/aip', require('./src/backend/modules/aip'));
+
+// Phase 4 & Phase 9 Ingestion Connectors Mount
 app.use('/api/v1/connectors/cctv', require('./src/backend/connectors/cctv_connector'));
 app.use('/api/v1/connectors/cdr', require('./src/backend/connectors/cdr_connector'));
 app.use('/api/v1/connectors/telemetry', require('./src/backend/connectors/telemetry_connector'));
+app.use('/api/v1/connectors/documents', require('./src/backend/connectors/document_connector'));
 app.use('/api/ingest/cctv', require('./src/backend/connectors/cctv_connector'));
 app.use('/api/ingest/cdr', require('./src/backend/connectors/cdr_connector'));
 app.use('/api/ingest/telemetry', require('./src/backend/connectors/telemetry_connector'));

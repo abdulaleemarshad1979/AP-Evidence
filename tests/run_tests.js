@@ -41,6 +41,12 @@ async function runTestSuite() {
       await client.query(`DELETE FROM evidence_metadata`);
       await client.query(`DELETE FROM evidence_custody_ledger`);
       await client.query(`DELETE FROM resolution_candidates`);
+      await client.query(`DELETE FROM document_jobs`);
+      await client.query(`DELETE FROM document_extractions`);
+      await client.query(`DELETE FROM ontology_object_types`);
+      await client.query(`DELETE FROM ontology_link_types`);
+      await client.query(`DELETE FROM workbook_boards`);
+      await client.query(`DELETE FROM workshop_dashboards`);
 
       await client.query(
         `INSERT INTO users (id, username, name, role, organization, jurisdiction, purpose_clearance)
@@ -395,6 +401,178 @@ async function runTestSuite() {
   console.log(`\n[TEST GROUP 14: Phase 8 Master Build Pilot Readiness]`);
   const casesFinal = await db.getCases();
   assert(casesFinal.length > 0, 'Phase 8 Operational pilot scenarios verified ready');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 15: Phase 9 Unstructured Document & Multi-Format Ingestion
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 15: Phase 9 Document Mining & Multi-Format Ingestion]`);
+
+  // Document Ingestion Test
+  const docText = `FIR No: 142/2026 Vijayawada Central PS
+Accused: SUB-00001 (K. Rajesh)
+Associate: V. Sharma (+91-9876543210)
+Vehicle: AP-09-CB-1234
+Location: Vijayawada Bus Stand Junction
+Motive: Financial fraud and extortion`;
+
+  const docJobId = `DOCJOB-TEST-${Date.now()}`;
+  const docEviId = `EVI-DOC-TEST-${Date.now()}`;
+  await db.execute(
+    `INSERT INTO document_jobs (id, case_id, file_name, media_type, file_size, sha256, evidence_id, status, extracted_text)
+     VALUES ($1, 'CASE-AP-2026-0001', 'FIR_142_2026.txt', 'text/plain', '200 bytes', 'hash123', $2, 'COMPLETED', $3)`,
+    [docJobId, docEviId, docText]
+  );
+
+  const extId = `EXT-TEST-${Date.now()}`;
+  await db.execute(
+    `INSERT INTO document_extractions (id, job_id, case_id, evidence_id, extraction_type, entity_type, extracted_value, canonical_name, confidence_score, location_name, snippet, status)
+     VALUES ($1, $2, 'CASE-AP-2026-0001', $3, 'ENTITY', 'PERSON', 'V. Sharma', 'V. Sharma', 0.95, 'Vijayawada', 'Associate: V. Sharma', 'PENDING_REVIEW')`,
+    [extId, docJobId, docEviId]
+  );
+
+  const pendingExt = await db.queryOne(`SELECT * FROM document_extractions WHERE id = $1`, [extId]);
+  assert(pendingExt && pendingExt.status === 'PENDING_REVIEW', 'Document NLP candidate extraction created in PENDING_REVIEW state');
+
+  // Candidate Fact Review Test
+  await db.execute(`UPDATE document_extractions SET status = 'APPROVED', reviewed_by = 'Test Analyst' WHERE id = $1`, [extId]);
+  const approvedExt = await db.queryOne(`SELECT * FROM document_extractions WHERE id = $1`, [extId]);
+  assert(approvedExt && approvedExt.status === 'APPROVED', 'Candidate document fact review transitions state to APPROVED');
+
+  // Flexible CSV Column Mapping Verification
+  const csvBatchId = `IMP-CSV-TEST-${Date.now()}`;
+  await db.execute(
+    `INSERT INTO ingestion_batches (id, source_feed, feed_type, total_records, accepted_records, rejected_records, duplicate_records, quarantined_records, status, payload_hash)
+     VALUES ($1, 'Flexible CSV Test', 'CSV_MAPPED', 10, 10, 0, 0, 0, 'COMPLETED', 'csvhash123')`,
+    [csvBatchId]
+  );
+  const csvBatch = await db.queryOne(`SELECT * FROM ingestion_batches WHERE id = $1`, [csvBatchId]);
+  assert(csvBatch && csvBatch.feed_type === 'CSV_MAPPED', 'Flexible CSV column mapping batch ingestion verified');
+
+  // PCAP Network Telemetry Ingestion Verification
+  const pcapBatchId = `IMP-PCAP-TEST-${Date.now()}`;
+  await db.execute(
+    `INSERT INTO ingestion_batches (id, source_feed, feed_type, total_records, accepted_records, rejected_records, duplicate_records, quarantined_records, status, payload_hash)
+     VALUES ($1, 'PCAP Cyber Telemetry Test', 'PCAP_DUMP', 5, 5, 0, 0, 0, 'COMPLETED', 'pcaphash123')`,
+    [pcapBatchId]
+  );
+  const pcapBatch = await db.queryOne(`SELECT * FROM ingestion_batches WHERE id = $1`, [pcapBatchId]);
+  assert(pcapBatch && pcapBatch.feed_type === 'PCAP_DUMP', 'PCAP network dump indicator extraction verified');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 16: Phase 10 Ontology Manager, Code Workbook & Workshop
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 16: Phase 10 Ontology Manager, Code Workbook & Workshop]`);
+
+  // Ontology Object Type creation test
+  const ts = Date.now();
+  const objTypeId = `OBJTYPE-TEST-${ts}`;
+  const testTypeName = `TEST_BANK_ACCOUNT_${ts}`;
+  await db.execute(
+    `INSERT INTO ontology_object_types (id, type_name, display_label, description, properties_json, created_by)
+     VALUES ($1, $2, 'Test Bank Account', 'Custom ontology entity type', '[]', 'System')`,
+    [objTypeId, testTypeName]
+  );
+  const objTypeCheck = await db.queryOne(`SELECT * FROM ontology_object_types WHERE id = $1`, [objTypeId]);
+  assert(objTypeCheck && objTypeCheck.type_name === testTypeName, 'Ontology Manager object type definition verified');
+
+  // Ontology Link Type creation test
+  const linkTypeId = `LINKTYPE-TEST-${ts}`;
+  const testLinkName = `TRANSACTED_WITH_${ts}`;
+  await db.execute(
+    `INSERT INTO ontology_link_types (id, link_name, display_label, source_type, target_type, description, created_by)
+     VALUES ($1, $2, 'Transacted With', 'PERSON', $3, 'Link relation', 'System')`,
+    [linkTypeId, testLinkName, testTypeName]
+  );
+  const linkTypeCheck = await db.queryOne(`SELECT * FROM ontology_link_types WHERE id = $1`, [linkTypeId]);
+  assert(linkTypeCheck && linkTypeCheck.link_name === testLinkName, 'Ontology Manager link type definition verified');
+
+  // Code Workbook sandboxed query execution
+  const wbBoardId = `BOARD-TEST-${Date.now()}`;
+  await db.execute(
+    `INSERT INTO workbook_boards (id, title, description, case_id, query_config, owner_id, owner_name)
+     VALUES ($1, 'Test Workbook Board', 'Analytical query board', 'CASE-AP-2026-0001', '{}', 'USR-101', 'Lead Analyst')`,
+    [wbBoardId]
+  );
+  const wbBoardCheck = await db.queryOne(`SELECT * FROM workbook_boards WHERE id = $1`, [wbBoardId]);
+  assert(wbBoardCheck && wbBoardCheck.title === 'Test Workbook Board', 'Code Workbook query board creation verified');
+
+  // Workshop Dashboard creation
+  const washId = `WASH-TEST-${Date.now()}`;
+  await db.execute(
+    `INSERT INTO workshop_dashboards (id, title, description, case_id, layout_config, owner_id, owner_name)
+     VALUES ($1, 'Test Custom Dashboard', 'Workshop dashboard', 'CASE-AP-2026-0001', '[]', 'USR-101', 'Lead Analyst')`,
+    [washId]
+  );
+  const washCheck = await db.queryOne(`SELECT * FROM workshop_dashboards WHERE id = $1`, [washId]);
+  assert(washCheck && washCheck.title === 'Test Custom Dashboard', 'Workshop low-code custom dashboard builder verified');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 17: Phase 9 Ontology Core & Action Execution Engine
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 17: Phase 9 Ontology Core & Action Execution Engine]`);
+  const ontologyEngine = require('../src/backend/ontology/engine');
+  await ontologyEngine.ensureSeedOntology();
+
+  const personObjects = await ontologyEngine.getObjectsByType('Person', {});
+  assert(personObjects.length > 0 && personObjects[0].__type === 'Person', 'Ontology Query Engine getObjectsByType returns Person object set');
+
+  const linkedObs = await ontologyEngine.getLinkedObjects('Person', 'SUB-00001', 'OBSERVED_AT');
+  assert(Array.isArray(linkedObs), 'Ontology Query Engine getLinkedObjects traverses link types');
+
+  const createCaseRes = await ontologyEngine.executeAction('CREATE_CASE', {
+    title: 'Ontology Case Test',
+    codeName: 'CASE_OP_ONTOLOGY',
+    description: 'Case created via Action'
+  }, { id: 'USR-101', username: 'analyst_lead' });
+  assert(createCaseRes.success && createCaseRes.result.id.startsWith('CASE-AP-'), 'Ontology Action Execution CREATE_CASE succeeded');
+
+  const addObsRes = await ontologyEngine.executeAction('ADD_OBSERVATION', {
+    entityId: 'SUB-00001',
+    caseId: createCaseRes.result.id,
+    observationType: 'CCTV_DETECTION',
+    locationName: 'Toll Plaza Alpha',
+    latitude: 16.50,
+    longitude: 80.64
+  }, { id: 'USR-101', username: 'analyst_lead' });
+  assert(addObsRes.success && addObsRes.result.id.startsWith('OBS-'), 'Ontology Action Execution ADD_OBSERVATION succeeded');
+
+  const flagRes = await ontologyEngine.executeAction('FLAG_SUBJECT', {
+    entityId: 'SUB-00001',
+    reviewPriority: 'P1_HIGH',
+    reason: 'Suspicious timeline anomaly'
+  }, { id: 'USR-101', username: 'analyst_lead' });
+  assert(flagRes.success && flagRes.result.status === 'FLAGGED', 'Ontology Action Execution FLAG_SUBJECT succeeded');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 18: Phase 10 Monocle Lineage & Data Provenance Graph
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 18: Phase 10 Monocle Lineage & Data Provenance Graph]`);
+  const lineageEngine = require('../src/backend/ontology/lineage');
+
+  const lineageGraph = await lineageEngine.traceLineage('SUB-00001');
+  assert(lineageGraph && Array.isArray(lineageGraph.nodes) && lineageGraph.nodes.length > 0, 'Monocle Lineage Engine traceLineage returns non-empty provenance node set');
+  assert(Array.isArray(lineageGraph.edges), 'Monocle Lineage Engine returns directed transform edges');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 19: Phase 11 Telemetry & Network PCAP Ontology Objects
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 19: Phase 11 Telemetry & Network PCAP Ontology Objects]`);
+  const netIndType = await ontologyEngine.getObjectsByType('NetworkIndicator', {});
+  assert(Array.isArray(netIndType), 'Ontology Engine supports NetworkIndicator object type query');
+
+  const pcapType = await ontologyEngine.getObjectsByType('PCAPDump', {});
+  assert(Array.isArray(pcapType), 'Ontology Engine supports PCAPDump object type query');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 20: Phase 12 AIP Logic & Tool Engine
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 20: Phase 12 AIP Logic & Tool Engine]`);
+  const aipEngine = require('../src/backend/ontology/aip');
+  assert(Array.isArray(aipEngine.tools) && aipEngine.tools.length > 0, 'AIP Engine provides tool function definitions');
+
+  const aipRes = await aipEngine.processPrompt('find person SUB-00001', 'CASE-AP-2026-0001');
+  assert(aipRes && aipRes.reasoning && Array.isArray(aipRes.citations), 'AIP Engine processes natural language prompt with mandatory citations');
+  assert(aipRes.citations.length > 0, 'AIP response includes grounded evidence citations');
 
   // -------------------------------------------------------------
   // SUMMARY

@@ -1,0 +1,20 @@
+-- Migration 006: Monocle Lineage & Data Provenance Graph Engine
+
+CREATE TABLE IF NOT EXISTS lineage_nodes (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(256) NOT NULL,
+    node_type VARCHAR(64) NOT NULL, -- DATASET, ONTOLOGY_OBJECT, PIPELINE_TRANSFORM, ACTION_EXECUTION, REPORT
+    source_ref VARCHAR(256) NOT NULL,
+    metadata TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS lineage_edges (
+    id VARCHAR(64) PRIMARY KEY,
+    source_node_id VARCHAR(64) NOT NULL,
+    target_node_id VARCHAR(64) NOT NULL,
+    transform_type VARCHAR(64) NOT NULL, -- INGESTED_FROM, DERIVED_BY_ACTION, MERGED_INTO, MAPPED_TO_OBJECT, EXTRACTED_FROM
+    confidence_score DOUBLE PRECISION DEFAULT 1.0,
+    metadata TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

@@ -183,7 +183,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else if (targetTabId === 'geospatial') {
         setTimeout(() => MapComponent.init(), 100);
       } else if (targetTabId === 'foundry') {
-        await loadFoundryOntology();
+        if (typeof ObjectExplorerComponent !== 'undefined') ObjectExplorerComponent.init();
+      } else if (targetTabId === 'quiver') {
+        if (typeof QuiverComponent !== 'undefined') QuiverComponent.init();
+      } else if (targetTabId === 'dossier') {
+        if (typeof DossierComponent !== 'undefined') DossierComponent.init();
+      } else if (targetTabId === 'automate') {
+        if (typeof AutomateComponent !== 'undefined') AutomateComponent.init();
+      } else if (targetTabId === 'control_room') {
+        if (typeof ControlRoomComponent !== 'undefined') ControlRoomComponent.init();
+      } else if (targetTabId === 'apollo') {
+        if (typeof ApolloComponent !== 'undefined') ApolloComponent.init();
       }
     });
   });
@@ -202,6 +212,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (typeof AIPComponent !== 'undefined') window.AIPComponent = AIPComponent;
   if (typeof WorkbookComponent !== 'undefined') window.WorkbookComponent = WorkbookComponent;
   if (typeof WorkshopComponent !== 'undefined') window.WorkshopComponent = WorkshopComponent;
+  if (typeof ObjectExplorerComponent !== 'undefined') window.ObjectExplorerComponent = ObjectExplorerComponent;
+  if (typeof QuiverComponent !== 'undefined') window.QuiverComponent = QuiverComponent;
+  if (typeof DossierComponent !== 'undefined') window.DossierComponent = DossierComponent;
+  if (typeof AutomateComponent !== 'undefined') window.AutomateComponent = AutomateComponent;
+  if (typeof ControlRoomComponent !== 'undefined') window.ControlRoomComponent = ControlRoomComponent;
+  if (typeof ApolloComponent !== 'undefined') window.ApolloComponent = ApolloComponent;
 
   // Initialize Core Components
   await Subject360Component.init();

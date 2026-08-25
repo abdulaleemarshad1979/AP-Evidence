@@ -88,7 +88,13 @@
     <div class="nav-pillar-group">
       <span class="nav-pillar-tag">FOUNDRY</span>
       <button class="nav-tab" data-tab="foundry">
-        <i class="fa-solid fa-cubes"></i> Dynamic Ontology Explorer
+        <i class="fa-solid fa-cubes"></i> Dynamic Object Explorer
+      </button>
+      <button class="nav-tab" data-tab="quiver">
+        <i class="fa-solid fa-chart-line"></i> Quiver Canvas
+      </button>
+      <button class="nav-tab" data-tab="dossier">
+        <i class="fa-solid fa-file-signature"></i> Living Dossier
       </button>
       <button class="nav-tab" data-tab="resolution">
         <i class="fa-solid fa-object-group"></i> Entity Resolution <span class="badge" id="nav-res-badge">1</span>
@@ -99,7 +105,13 @@
     </div>
 
     <div class="nav-pillar-group">
-      <span class="nav-pillar-tag">AIP</span>
+      <span class="nav-pillar-tag">AIP & AUTOMATE</span>
+      <button class="nav-tab" data-tab="automate">
+        <i class="fa-solid fa-bell"></i> Automate Alerting
+      </button>
+      <button class="nav-tab" data-tab="control_room">
+        <i class="fa-solid fa-tower-observation"></i> Control Room
+      </button>
       <button class="nav-tab" data-tab="aip">
         <i class="fa-solid fa-brain"></i> Grounded AI Assistant
       </button>
@@ -281,51 +293,152 @@
       </div>
     </section>
 
-    <!-- 4. Foundry: Dynamic Ontology Explorer -->
+    <!-- 4. Foundry: Dynamic Object Explorer -->
     <section id="tab-foundry" class="tab-content">
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><i class="fa-solid fa-cubes"></i> PALANTIR FOUNDRY — DYNAMIC ONTOLOGY EXPLORER</div>
-          <span class="mono" style="font-size: 0.78rem; color: var(--accent-cyan);">Ontology Schema v3.4</span>
-        </div>
-
-        <div class="grid-3" style="margin-bottom: 1rem;">
-          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem; border-radius: 6px;">
-            <h4 style="font-size: 0.85rem; color: var(--accent-cyan);"><i class="fa-solid fa-user"></i> Person Entity Type</h4>
-            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">Canonical Person Objects with Jaro-Winkler resolution and provenance tags.</p>
-            <span class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">4 Registered Objects</span>
-          </div>
-
-          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem; border-radius: 6px;">
-            <h4 style="font-size: 0.85rem; color: var(--accent-amber);"><i class="fa-solid fa-car"></i> Vehicle Entity Type</h4>
-            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">ANPR scanned license plates, VINs, and owner relationship links.</p>
-            <span class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">3 Registered Objects</span>
-          </div>
-
-          <div style="background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem; border-radius: 6px;">
-            <h4 style="font-size: 0.85rem; color: var(--accent-purple);"><i class="fa-solid fa-phone"></i> Telecom & Bank Type</h4>
-            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">MSISDN encrypted lines, IMSI, and SWIFT wire accounts.</p>
-            <span class="mono" style="font-size: 0.75rem; color: var(--accent-emerald);">3 Registered Objects</span>
+          <div class="card-title"><i class="fa-solid fa-cubes"></i> PALANTIR FOUNDRY — OBJECT EXPLORER</div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="obj-explorer-type-select" class="form-select mono" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;" onchange="ObjectExplorerComponent.loadObjects()">
+              <option value="Person">Person (Person)</option>
+              <option value="Vehicle">Vehicle (Vehicle)</option>
+              <option value="Observation">Observation (Observation)</option>
+              <option value="Evidence">Evidence (Evidence)</option>
+              <option value="Case">Case (Case)</option>
+            </select>
+            <input type="text" id="obj-explorer-search-input" class="form-input mono" placeholder="Filter objects..." style="font-size: 0.8rem; padding: 0.3rem 0.6rem; width: 180px;" onkeyup="if(event.key==='Enter') ObjectExplorerComponent.loadObjects()">
+            <button class="btn btn-sm" onclick="ObjectExplorerComponent.loadObjects()"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
           </div>
         </div>
 
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Canonical Entity ID</th>
-                <th>Type</th>
-                <th>Primary Name</th>
-                <th>Identifiers & Aliases</th>
-                <th>Clearance Required</th>
-                <th>Data Provenance Source</th>
-                <th>Confidence</th>
-              </tr>
-            </thead>
-            <tbody id="foundry-ontology-tbody">
-              <!-- Populated via JavaScript -->
-            </tbody>
-          </table>
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); padding: 0.5rem 1rem; border-radius: 6px; margin-bottom: 1rem; border: 1px solid var(--border-color);">
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary" id="btn-obj-view-table" onclick="ObjectExplorerComponent.switchView('TABLE')"><i class="fa-solid fa-table"></i> Table</button>
+            <button class="btn" id="btn-obj-view-map" onclick="ObjectExplorerComponent.switchView('MAP')"><i class="fa-solid fa-map-location-dot"></i> Map</button>
+            <button class="btn" id="btn-obj-view-chart" onclick="ObjectExplorerComponent.switchView('CHART')"><i class="fa-solid fa-chart-bar"></i> Chart</button>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary" onclick="ObjectExplorerComponent.takeBulkAction()"><i class="fa-solid fa-bolt"></i> Take Governed Action</button>
+            <button class="btn" onclick="ObjectExplorerComponent.exportSet()"><i class="fa-solid fa-download"></i> Export Object Set</button>
+          </div>
+        </div>
+
+        <div id="obj-explorer-content-view">
+          <!-- Populated dynamically via ObjectExplorerComponent -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Quiver Analysis Canvas -->
+    <section id="tab-quiver" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-chart-line"></i> PALANTIR FOUNDRY — QUIVER ANALYSIS CANVAS</div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="quiver-canvas-select" class="form-select mono" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;" onchange="QuiverComponent.loadCanvasById(this.value)">
+              <option value="">Loading Saved Canvases...</option>
+            </select>
+            <input type="text" id="quiver-canvas-title-input" class="form-input mono" placeholder="Canvas Title" value="Analyst Quiver Canvas" style="font-size: 0.8rem; padding: 0.3rem 0.6rem; width: 180px;">
+            <button class="btn btn-primary" onclick="QuiverComponent.saveCanvas()"><i class="fa-solid fa-floppy-disk"></i> Save Canvas</button>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); padding: 0.5rem 1rem; border-radius: 6px; margin-bottom: 1rem; border: 1px solid var(--border-color);">
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary" onclick="QuiverComponent.switchMode('CANVAS')"><i class="fa-solid fa-layer-group"></i> Free-Form Canvas Mode</button>
+            <button class="btn" onclick="QuiverComponent.switchMode('GRAPH')"><i class="fa-solid fa-diagram-project"></i> Graph Mode</button>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn" onclick="QuiverComponent.addCard('OBJECT_SET')"><i class="fa-solid fa-plus"></i> Add Object Card</button>
+            <button class="btn" onclick="QuiverComponent.addCard('CHART')"><i class="fa-solid fa-plus"></i> Add Chart Card</button>
+          </div>
+        </div>
+
+        <div id="quiver-workspace-container">
+          <!-- Populated via QuiverComponent -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Dossier Living Reports -->
+    <section id="tab-dossier" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-file-signature"></i> PALANTIR GOTHAM — DOSSIER LIVING REPORTS</div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="dossier-report-select" class="form-select mono" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;" onchange="DossierComponent.loadDossierById(this.value)">
+              <option value="">Loading Saved Dossiers...</option>
+            </select>
+            <button class="btn btn-primary" onclick="DossierComponent.saveDossier()"><i class="fa-solid fa-floppy-disk"></i> Save Dossier</button>
+            <button class="btn" onclick="DossierComponent.exportReport()"><i class="fa-solid fa-file-export"></i> Export Report (MD)</button>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem;">
+          <input type="text" id="dossier-title-input" class="form-input" placeholder="Dossier Report Title" value="Living Operational Intelligence Report" style="font-weight: bold; font-size: 1rem;">
+          <input type="text" id="dossier-summary-input" class="form-input" placeholder="Executive Summary / Context" value="Dynamic living report linked directly to Ontology source entities.">
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h4 style="font-size: 0.85rem; color: var(--accent-cyan);"><i class="fa-solid fa-paragraph"></i> Report Content & Live Referenced Sources</h4>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn" onclick="DossierComponent.addSection()"><i class="fa-solid fa-plus"></i> Add Notes Section</button>
+            <button class="btn btn-primary" onclick="DossierComponent.linkObject()"><i class="fa-solid fa-link"></i> Link Ontology Object</button>
+          </div>
+        </div>
+
+        <div id="dossier-sections-container">
+          <!-- Populated via DossierComponent -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Automate Alerting Builder -->
+    <section id="tab-automate" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-bell"></i> PALANTIR AUTOMATE — ALERTING ENGINE BUILDER</div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary" onclick="AutomateComponent.createRule()"><i class="fa-solid fa-plus"></i> Create Automate Rule</button>
+            <button class="btn" onclick="AutomateComponent.triggerEvaluation()"><i class="fa-solid fa-play"></i> Trigger Evaluation Pass</button>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          <div>
+            <h4 style="font-size: 0.88rem; color: var(--accent-cyan); margin-bottom: 0.75rem;"><i class="fa-solid fa-sliders"></i> Active Continuous Automations</h4>
+            <div id="automate-rules-list-container">
+              <!-- Populated via AutomateComponent -->
+            </div>
+          </div>
+
+          <div>
+            <h4 style="font-size: 0.88rem; color: var(--accent-amber); margin-bottom: 0.75rem;"><i class="fa-solid fa-clock-rotate-left"></i> Automate Triggered Proposal History</h4>
+            <div id="automate-proposals-list-container">
+              <!-- Populated via AutomateComponent -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cross-Case Control Room Command Center -->
+    <section id="tab-control_room" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-tower-observation"></i> PALANTIR GOTHAM — CROSS-CASE CONTROL ROOM</div>
+          <button class="btn btn-primary" onclick="ControlRoomComponent.init()"><i class="fa-solid fa-arrows-rotate"></i> Refresh Telemetry</button>
+        </div>
+
+        <div id="control-room-health-container">
+          <!-- Populated via ControlRoomComponent -->
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <h4 style="font-size: 0.88rem; color: var(--accent-amber); margin-bottom: 0.75rem;"><i class="fa-solid fa-clipboard-check"></i> Unified Cross-Case Pending-Review Queue (AIP & Automate Proposals)</h4>
+          <div id="control-room-queue-container">
+            <!-- Populated via ControlRoomComponent -->
+          </div>
         </div>
       </div>
     </section>
@@ -582,6 +695,36 @@
           </table>
         </div>
       </div>
+    <section id="tab-apollo" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fa-solid fa-server" style="color: var(--accent-purple);"></i> PALANTIR APOLLO — FLEET RELEASE ORCHESTRATION</div>
+          <button class="btn btn-primary" onclick="ApolloComponent.init()"><i class="fa-solid fa-sync"></i> Refresh Fleet Telemetry</button>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          <div>
+            <h4 style="font-size: 0.88rem; color: var(--accent-cyan); margin-bottom: 0.75rem;"><i class="fa-solid fa-network-wired"></i> Managed Environments & Release Agent Pings</h4>
+            <div id="apollo-environments-list-container">
+              <!-- Populated via ApolloComponent -->
+            </div>
+          </div>
+
+          <div>
+            <h4 style="font-size: 0.88rem; color: var(--accent-amber); margin-bottom: 0.75rem;"><i class="fa-solid fa-sliders"></i> Environment Configuration Diff Inspector (DEV vs PROD)</h4>
+            <div id="apollo-config-diff-container">
+              <!-- Populated via ApolloComponent -->
+            </div>
+          </div>
+
+          <div>
+            <h4 style="font-size: 0.88rem; color: var(--accent-purple); margin-bottom: 0.75rem;"><i class="fa-solid fa-layer-group"></i> Active & Historical Deployment Plans</h4>
+            <div id="apollo-plans-list-container">
+              <!-- Populated via ApolloComponent -->
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
   </main>
@@ -674,6 +817,12 @@
   <script src="/js/components/aip.js"></script>
   <script src="/js/components/workbook.js"></script>
   <script src="/js/components/workshop.js"></script>
+  <script src="/js/components/object_explorer.js"></script>
+  <script src="/js/components/quiver.js"></script>
+  <script src="/js/components/dossier.js"></script>
+  <script src="/js/components/automate.js"></script>
+  <script src="/js/components/control_room.js"></script>
+  <script src="/js/components/apollo.js"></script>
   <script src="/js/app.js"></script>
 
 </body>

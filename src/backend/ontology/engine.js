@@ -124,7 +124,9 @@ class OntologyEngine {
     // Filter handling based on backing table
     if (backingTable === 'entities') {
       sql += ` AND status != 'MERGED'`;
-      if (apiName !== 'Person' && apiName !== 'Subject') {
+      if (apiName === 'Person' || apiName === 'Subject') {
+        sql += ` AND (type = 'Person' OR type = 'Subject' OR type IS NULL)`;
+      } else {
         params.push(apiName);
         sql += ` AND type = $${params.length}`;
       }
@@ -209,6 +211,163 @@ class OntologyEngine {
       } catch (e) {}
     }
     return results;
+  }
+
+  /**
+   * Get All Objects across ALL active Ontology Object Types (load-bearing for Graph & Subject 360)
+   */
+  async getAllObjects(filter = {}, user = null) {
+    await this.ensureSeedOntology();
+    const objectTypes = await db.query(`SELECT * FROM ontology_object_types WHERE status = 'ACTIVE' ORDER BY created_at ASC`);
+    const allObjects = [];
+
+    for (const ot of objectTypes) {
+      const typeName = ot.api_name || ot.type_name;
+      try {
+        const objs = await this.getObjectsByType(typeName, filter, user);
+        allObjects.push(...objs);
+      } catch (e) {}
+    }
+
+    return allObjects;
+  }
+
+  /**
+   * Get Single Object by Primary Key ID across Ontology Object Types
+   */
+  async getObjectById(id, user = null) {
+    await this.ensureSeedOntology();
+    const entity = await db.getEntityById(id);
+    if (entity) {
+      return {
+        __type: entity.type || 'Person',
+        __primaryKey: entity.id,
+        properties: entity,
+        ...entity
+      };
+    }
+
+    const all = await this.getAllObjects({}, user);
+    const match = all.find(o => o.__primaryKey === id || o.properties?.id === id);
+    if (match) {
+      return {
+        ...match,
+        ...match.properties
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Get Assertions (Relationships) through Ontology Core
+   */
+  async getAssertions(caseId, filter = {}, user = null) {
+    await this.ensureSeedOntology();
+    let sql = `SELECT * FROM assertions WHERE 1=1`;
+    const params = [];
+
+    if (caseId) {
+      params.push(caseId);
+      sql += ` AND case_id = $${params.length}`;
+    }
+
+    if (filter.entityId) {
+      params.push(filter.entityId);
+      sql += ` AND (subject_entity_id = $${params.length} OR object_entity_id = $${params.length})`;
+    }
+
+    sql += ` ORDER BY created_at DESC`;
+    return await db.query(sql, params);
+  }
+
+  /**
+   * Get Observations through Ontology Core
+   */
+  async getObservations(filter = {}, user = null) {
+    await this.ensureSeedOntology();
+    let sql = `SELECT * FROM observations WHERE 1=1`;
+    const params = [];
+
+    if (filter.caseId) {
+      params.push(filter.caseId);
+      sql += ` AND case_id = $${params.length}`;
+    }
+
+    if (filter.entityId) {
+      params.push(filter.entityId);
+      sql += ` AND entity_id = $${params.length}`;
+    }
+
+    if (filter.excludeEntityId) {
+      params.push(filter.excludeEntityId);
+      sql += ` AND entity_id != $${params.length}`;
+    }
+
+    sql += ` ORDER BY timestamp ASC`;
+    return await db.query(sql, params);
+  }
+
+  /**
+   * Get Geospatial Observations (Bounding Box Query) through Ontology Core
+   */
+  async getGeospatialObservations({ targetCaseId, minLon, minLat, maxLon, maxLat }, user = null) {
+    await this.ensureSeedOntology();
+    if (!db.isPgMem && minLon && minLat && maxLon && maxLat) {
+      return await db.query(
+        `SELECT * FROM observations 
+         WHERE case_id = $1 AND location_geom && ST_MakeEnvelope($2, $3, $4, $5, 4326)
+         ORDER BY timestamp DESC`,
+        [targetCaseId, parseFloat(minLon), parseFloat(minLat), parseFloat(maxLon), parseFloat(maxLat)]
+      );
+    }
+    return await db.query(
+      `SELECT * FROM observations WHERE case_id = $1 ORDER BY timestamp DESC`,
+      [targetCaseId]
+    );
+  }
+
+  /**
+   * Get Co-located Observations through Ontology Core
+   */
+  async getColocatedObservations({ targetId, radiusMeters = 500, targetCaseId }, user = null) {
+    await this.ensureSeedOntology();
+    const targetObs = await db.query(`SELECT * FROM observations WHERE entity_id = $1 AND case_id = $2`, [targetId || 'SUB-00001', targetCaseId]);
+
+    if (!db.isPgMem && targetObs.length > 0) {
+      return await db.query(
+        `SELECT DISTINCT o2.* 
+         FROM observations o1
+         JOIN observations o2 ON o1.entity_id != o2.entity_id AND o1.case_id = o2.case_id
+         WHERE o1.entity_id = $1 AND o1.case_id = $2
+           AND ST_DWithin(o1.location_geom, o2.location_geom, $3)`,
+        [targetId || 'SUB-00001', targetCaseId, radiusMeters]
+      );
+    }
+
+    return await db.query(`SELECT * FROM observations WHERE case_id = $1 AND entity_id != $2`, [targetCaseId, targetId || 'SUB-00001']);
+  }
+
+  /**
+   * Get Trajectory Waypoints through Ontology Core
+   */
+  async getTrajectory({ entityId, targetCaseId }, user = null) {
+    await this.ensureSeedOntology();
+    return await db.query(
+      `SELECT id, timestamp, location_name, latitude, longitude, confidence_score 
+       FROM observations 
+       WHERE entity_id = $1 AND case_id = $2 
+       ORDER BY timestamp ASC`,
+      [entityId || 'SUB-00001', targetCaseId]
+    );
+  }
+
+  /**
+   * Get Evidence List through Ontology Core
+   */
+  async getEvidenceList(filter = {}, user = null) {
+    await this.ensureSeedOntology();
+    return await db.getEvidenceList(filter);
   }
 
   /**

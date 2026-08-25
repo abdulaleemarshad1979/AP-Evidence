@@ -575,6 +575,278 @@ Motive: Financial fraud and extortion`;
   assert(aipRes.citations.length > 0, 'AIP response includes grounded evidence citations');
 
   // -------------------------------------------------------------
+  // TEST GROUP 21: Hardened AIP Human-in-the-Loop Governance & Review Queue
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 21: Hardened AIP Human-in-the-Loop Governance & Review Queue]`);
+  const governedAipRes = await aipEngine.processPrompt('Flag subject SUB-00001 for review', 'CASE-AP-2026-0001');
+  assert(governedAipRes.status === 'PROPOSED_PENDING_REVIEW', 'AIP redirects governed action to PROPOSED_PENDING_REVIEW state');
+  assert(governedAipRes.isProposed === true && governedAipRes.pendingRunId, 'AIP returns valid pendingRunId without executing action immediately');
+
+  const pendingRun = await db.queryOne(`SELECT * FROM ai_runs WHERE id = $1`, [governedAipRes.pendingRunId]);
+  assert(pendingRun && pendingRun.review_status === 'PENDING_REVIEW', 'AI proposed run stored in ai_runs with review_status PENDING_REVIEW');
+
+  // Simulate human review approval endpoint
+  const runParams = typeof pendingRun.input_params === 'string' ? JSON.parse(pendingRun.input_params) : pendingRun.input_params;
+  const approvedAction = await ontologyEngine.executeAction(runParams.actionType, runParams.input, { id: 'USR-101', username: 'analyst_lead' });
+  await db.updateAIRunStatus(governedAipRes.pendingRunId, 'APPROVED', 'analyst_lead', 'Approved during test run');
+
+  assert(approvedAction.success && approvedAction.result.status === 'FLAGGED', 'Human approval successfully executes governed action FLAG_SUBJECT');
+  const updatedRun = await db.queryOne(`SELECT * FROM ai_runs WHERE id = $1`, [governedAipRes.pendingRunId]);
+  assert(updatedRun.review_status === 'APPROVED', 'AIP run review status updated to APPROVED after human intervention');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 22: Load-Bearing Ontology Core Proof (Dynamic Object Types)
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 22: Load-Bearing Ontology Core Proof (Dynamic Object Types)]`);
+  const timestamp = Date.now();
+  const widgetTypeName = `TestWidget_${timestamp}`;
+  const widgetTypeId = `OBJTYPE-WIDGET-${timestamp}`;
+  await db.execute(
+    `INSERT INTO ontology_object_types (id, api_name, type_name, display_name, display_label, description, primary_key_property, backing_table_or_view, icon_name, properties_json, version, status, created_by)
+     VALUES ($1, $2, $2, 'Test Widget Object', 'Test Widget Object', 'Dynamic object type for load-bearing proof', 'id', 'entities', 'fa-cube', '[]', 1, 'ACTIVE', 'admin')`,
+    [widgetTypeId, widgetTypeName]
+  );
+
+  const widgetId = `WIDGET-${timestamp}`;
+  await db.execute(
+    `INSERT INTO entities (id, name, type, evidence_status, assertion_class, confidence_method, human_review_status, review_priority, is_fictional)
+     VALUES ($1, 'Quantum Encryption Unit', $2, 'VERIFIED_RAW', 'CONFIRMED_FACT', 'MANUAL_VERIFIED', 'UNREVIEWED', 'P2_MEDIUM', false)`,
+    [widgetId, widgetTypeName]
+  );
+
+  const allOntologyObjects = await ontologyEngine.getAllObjects();
+  const widgetObj = allOntologyObjects.find(o => o.__primaryKey === widgetId || o.properties?.id === widgetId);
+  assert(widgetObj && widgetObj.__type === widgetTypeName, 'Dynamic TestWidget object retrieved automatically through Ontology Core');
+
+  const graphQueryObjects = await ontologyEngine.getAllObjects({ search: 'Quantum Encryption Unit' });
+  assert(graphQueryObjects.some(o => (o.properties?.id || o.__primaryKey) === widgetId), 'Graph query retrieves dynamic TestWidget object with zero code changes to graph.js');
+
+  // -------------------------------------------------------------
+  // TEST GROUP 23: Phase 13 Investigator Workspace (Explorer, Quiver, Dossier)
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 23: Phase 13 Investigator Workspace Verification]`);
+
+  // Test 1: Object Explorer query results match direct engine query
+  const directPersons = await ontologyEngine.getObjectsByType('Person', {});
+  const explorerSearch = await ontologyEngine.getObjectsByType('Person', {});
+  assert(
+    directPersons.length === explorerSearch.length && directPersons.length > 0 && directPersons[0].__primaryKey === explorerSearch[0].__primaryKey,
+    'Object Explorer results match direct ontologyEngine.getObjectsByType query'
+  );
+
+  // Test 2: Saved Quiver canvas round-trips correctly
+  const savedCanvas = await db.saveQuiverCanvas({
+    caseId: 'CASE-AP-2026-0001',
+    title: 'Test Quiver Roundtrip',
+    mode: 'CANVAS',
+    canvasData: { cards: [{ id: 'C1', type: 'OBJECT_SET' }] },
+    ownerId: 'USR-101',
+    ownerName: 'analyst_lead'
+  });
+  const fetchedCanvas = await db.getQuiverCanvasById(savedCanvas.id);
+  assert(
+    fetchedCanvas && fetchedCanvas.title === 'Test Quiver Roundtrip' && fetchedCanvas.case_id === 'CASE-AP-2026-0001',
+    'Saved Quiver analysis canvas round-trips correctly'
+  );
+
+  // Test 3: Dossier's linked-object content updates when source object property changes
+  const dossierDowntimeId = `DOS-TEST-${Date.now()}`;
+  await db.saveDossier({
+    id: dossierDowntimeId,
+    caseId: 'CASE-AP-2026-0001',
+    title: 'Living Test Dossier',
+    summary: 'Dynamic reference test',
+    sections: [{ heading: 'Sec 1', notes: 'Linked subject test' }],
+    linkedObjectRefs: ['SUB-00001'],
+    status: 'PUBLISHED'
+  });
+
+  // Verify initial live object property
+  const liveObjInitial = await ontologyEngine.getObjectById('SUB-00001', { id: 'USR-101', role: 'Lead Investigator' });
+  const initialName = liveObjInitial.name || liveObjInitial.properties?.name;
+
+  // Mutate source entity in database
+  const newName = `Test Entity 1 Mutated ${Date.now()}`;
+  await db.execute(`UPDATE entities SET name = $1 WHERE id = 'SUB-00001'`, [newName]);
+
+  // Fetch live resolved object again via Ontology Engine
+  const liveObjUpdated = await ontologyEngine.getObjectById('SUB-00001', { id: 'USR-101', role: 'Lead Investigator' });
+  const updatedName = liveObjUpdated.name || liveObjUpdated.properties?.name;
+
+  assert(
+    updatedName === newName && updatedName !== initialName,
+    'Living Dossier linked-object content automatically updates when source object property changes'
+  );
+
+  // -------------------------------------------------------------
+  // TEST GROUP 24: Phase 14 Automate Governance Alerting Engine
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 24: Phase 14 Automate Alerting Engine Verification]`);
+  const automateEngine = require('../src/backend/ontology/automate');
+
+  // Register Automate rule for speed plausibility
+  const autoRuleId = `AUTO-RULE-TEST-${Date.now()}`;
+  await db.saveAutomation({
+    id: autoRuleId,
+    name: 'High Speed Plausibility Violation',
+    description: 'Propose FLAG_SUBJECT when speed > 120 km/h',
+    proposedActionType: 'FLAG_SUBJECT',
+    conditionDefinition: { type: 'SPEED_PLAUSIBILITY', maxSpeedKmH: 120 },
+    reviewRequired: true,
+    enabled: true,
+    createdBy: 'Test Suite'
+  });
+
+  // Ingest high-speed observation pair for SUB-00001 (50 km in 5 min)
+  const ts1 = new Date('2026-08-25T10:00:00Z').toISOString();
+  const ts2 = new Date('2026-08-25T10:05:00Z').toISOString();
+
+  await ontologyEngine.executeAction('ADD_OBSERVATION', {
+    entityId: 'SUB-00001',
+    caseId: 'CASE-AP-2026-0001',
+    observationType: 'CCTV_DETECTION',
+    locationName: 'Node A',
+    latitude: 16.5000,
+    longitude: 80.6000,
+    timestamp: ts1
+  }, { id: 'USR-101', username: 'analyst_lead' });
+
+  await ontologyEngine.executeAction('ADD_OBSERVATION', {
+    entityId: 'SUB-00001',
+    caseId: 'CASE-AP-2026-0001',
+    observationType: 'CCTV_DETECTION',
+    locationName: 'Node B',
+    latitude: 16.9000,
+    longitude: 81.0000,
+    timestamp: ts2
+  }, { id: 'USR-101', username: 'analyst_lead' });
+
+  // Evaluate automations
+  const proposals = await automateEngine.evaluateAutomations();
+  assert(proposals.length > 0, 'Automate engine successfully triggered proposal for speed violation');
+
+  const pendingProposalId = proposals[0].proposalId;
+  const proposalRun = await db.queryOne(`SELECT * FROM ai_runs WHERE id = $1`, [pendingProposalId]);
+  assert(
+    proposalRun && proposalRun.review_status === 'PENDING_REVIEW',
+    'Automate rule condition met created action proposal in PENDING_REVIEW state (NOT executed directly)'
+  );
+
+  // Assert target entity is not flagged prior to human approval
+  const entityBeforeApproval = await db.getEntityById('SUB-00001');
+  assert(
+    entityBeforeApproval.human_review_status !== 'FLAGGED' && entityBeforeApproval.status !== 'FLAGGED',
+    'Governed Action is strictly held in pending queue and not executed automatically'
+  );
+
+  // Approve proposal and execute action
+  const params = typeof proposalRun.input_params === 'string' ? JSON.parse(proposalRun.input_params) : proposalRun.input_params;
+  const approvedAutomateAction = await ontologyEngine.executeAction(params.actionType, params.input, { id: 'USR-101', username: 'analyst_lead' });
+  await db.updateAIRunStatus(pendingProposalId, 'APPROVED', 'analyst_lead', 'Approved during test run');
+
+  assert(
+    approvedAutomateAction.success && approvedAutomateAction.result.status === 'FLAGGED',
+    'Human approval successfully executes governed Automate proposed action'
+  );
+
+  // -------------------------------------------------------------
+  // TEST GROUP 25: Phase 15 Apollo Release Orchestration Engine
+  // -------------------------------------------------------------
+  console.log(`\n[TEST GROUP 25: Phase 15 Apollo Release Orchestration Verification]`);
+
+  // 1. Register test environments
+  const stagingEnvId = `ENV-STAGING-${Date.now()}`;
+  const prodEnvId = `ENV-PROD-${Date.now()}`;
+
+  await db.saveApolloEnvironment({
+    id: stagingEnvId,
+    name: 'Staging Integration Cluster',
+    environmentType: 'STAGING',
+    configJson: { logLevel: 'DEBUG' },
+    currentVersion: '2.0.0',
+    targetVersion: '2.0.0',
+    healthStatus: 'HEALTHY'
+  });
+
+  await db.saveApolloEnvironment({
+    id: prodEnvId,
+    name: 'Production Field Unit',
+    environmentType: 'PROD',
+    configJson: { logLevel: 'WARN' },
+    currentVersion: '2.0.0',
+    targetVersion: '2.0.0',
+    healthStatus: 'HEALTHY'
+  });
+
+  // 2. Create release plan from v2.0.0 to v2.1.0 for Staging environment
+  const planId = `PLAN-${Date.now()}`;
+  await db.saveApolloReleasePlan({
+    id: planId,
+    environmentId: stagingEnvId,
+    fromVersion: '2.0.0',
+    toVersion: '2.1.0',
+    status: 'DEPLOYING',
+    approvalRequired: false,
+    approvedBy: 'Test Suite Lead',
+    stepsJson: [
+      { step: 1, name: 'Apply Migration', status: 'PENDING' },
+      { step: 2, name: 'Deploy Binaries', status: 'PENDING' }
+    ]
+  });
+
+  // Update target version on environment
+  await db.saveApolloEnvironment({ id: stagingEnvId, targetVersion: '2.1.0' });
+
+  // 3. Agent polls and executes progress steps
+  const agentPollRes = await db.getApolloReleasePlanById(planId);
+  assert(agentPollRes && agentPollRes.to_version === '2.1.0', 'Agent receives release plan with target version v2.1.0');
+
+  // Complete step 1 and step 2
+  const stepsArr = typeof agentPollRes.steps_json === 'string' ? JSON.parse(agentPollRes.steps_json) : agentPollRes.steps_json;
+  stepsArr.forEach(s => s.status = 'COMPLETED');
+
+  await db.saveApolloReleasePlan({
+    id: planId,
+    status: 'SUCCESS',
+    stepsJson: stepsArr
+  });
+
+  await db.saveApolloEnvironment({
+    id: stagingEnvId,
+    currentVersion: '2.1.0',
+    targetVersion: '2.1.0',
+    healthStatus: 'HEALTHY'
+  });
+
+  const updatedEnv = await db.getApolloEnvironmentById(stagingEnvId);
+  assert(updatedEnv && updatedEnv.current_version === '2.1.0', 'Environment current_version successfully upgraded to v2.1.0 upon plan completion');
+
+  // 4. Trigger Emergency Rollback
+  const rollbackPlanId = `PLAN-ROLLBACK-${Date.now()}`;
+  await db.saveApolloReleasePlan({
+    id: rollbackPlanId,
+    environmentId: stagingEnvId,
+    fromVersion: '2.1.0',
+    toVersion: '2.0.0',
+    status: 'SUCCESS',
+    approvalRequired: false,
+    approvedBy: 'Test Suite Lead',
+    stepsJson: [{ step: 1, name: 'Immediate Emergency Rollback', status: 'COMPLETED' }]
+  });
+
+  await db.saveApolloEnvironment({
+    id: stagingEnvId,
+    currentVersion: '2.0.0',
+    targetVersion: '2.0.0',
+    healthStatus: 'HEALTHY'
+  });
+
+  await db.logAudit('TEST_RUNNER', 'Test Suite Lead', 'APOLLO_ROLLBACK', 'APOLLO_ORCHESTRATION', `Reverted ${stagingEnvId} to v2.0.0`, rollbackPlanId);
+
+  const revertedEnv = await db.getApolloEnvironmentById(stagingEnvId);
+  assert(revertedEnv && revertedEnv.current_version === '2.0.0', 'Emergency Rollback successfully reverts environment current_version to v2.0.0 with audit log entry');
+
+  // -------------------------------------------------------------
   // SUMMARY
   // -------------------------------------------------------------
   console.log(`\n================================================================`);

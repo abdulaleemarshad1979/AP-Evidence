@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const ontologyEngine = require('../ontology/engine');
 const { authenticateMiddleware, maskSubjectData } = require('../middleware/auth');
 const { abacMiddleware } = require('../middleware/abac');
 
@@ -20,12 +21,12 @@ function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
 router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
   const targetCaseId = req.query.caseId || req.headers['x-case-id'];
   if (targetCaseId) return targetCaseId;
-  const obs = await db.queryOne(`SELECT case_id FROM observations WHERE entity_id = $1 LIMIT 1`, [req.params.id]);
-  return obs ? obs.case_id : 'CASE-SYN-0001';
+  const obs = await ontologyEngine.getObservations({ entityId: req.params.id });
+  return obs.length > 0 ? obs[0].case_id : 'CASE-SYN-0001';
 }), async (req, res) => {
   const entityId = req.params.id;
   const targetCaseId = req.query.caseId || req.headers['x-case-id'] || 'CASE-SYN-0001';
-  let entity = await db.getEntityById(entityId);
+  let entity = await ontologyEngine.getObjectById(entityId, req.user);
 
   if (!entity) {
     return res.status(404).json({ error: 'Subject entity not found' });
@@ -37,7 +38,7 @@ router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
 
   // Handle canonical entity redirect if entity was merged
   if (entity.status === 'MERGED' && entity.canonicalEntityId) {
-    const canonical = await db.getEntityById(entity.canonicalEntityId);
+    const canonical = await ontologyEngine.getObjectById(entity.canonicalEntityId, req.user);
     return res.json({
       redirect: true,
       canonicalEntityId: entity.canonicalEntityId,
@@ -46,21 +47,14 @@ router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
     });
   }
 
-  const observationsRows = await db.query(
-    `SELECT * FROM observations WHERE entity_id = $1 AND case_id = $2 ORDER BY timestamp ASC`,
-    [entityId, targetCaseId]
-  );
-  
-  const assertionsRows = await db.query(
-    `SELECT * FROM assertions WHERE (subject_entity_id = $1 OR object_entity_id = $1) AND case_id = $2 ORDER BY created_at DESC`,
-    [entityId, targetCaseId]
-  );
-
-  const evidenceRows = await db.getEvidenceList({ caseId: targetCaseId });
+  const observationsRows = await ontologyEngine.getObservations({ entityId, caseId: targetCaseId }, req.user);
+  const assertionsRows = await ontologyEngine.getAssertions(targetCaseId, { entityId }, req.user);
+  const evidenceRows = await ontologyEngine.getEvidenceList({ caseId: targetCaseId }, req.user);
   const linkedEvidence = evidenceRows.filter(ev => ev.associatedEntityIds && ev.associatedEntityIds.includes(entityId));
 
-  const allEntities = await db.getEntities();
-  const entityMap = new Map(allEntities.map(e => [e.id, maskSubjectData(e, userClearance)]));
+  const allObjects = await ontologyEngine.getAllObjects({}, req.user);
+  const allEntities = allObjects.map(o => o.properties || o);
+  const entityMap = new Map(allEntities.map(e => [(e.id || e.__primaryKey), maskSubjectData(e, userClearance)]));
 
   // Compute Movement Speed & Velocity Vector Plausibility
   const timeline = [];
@@ -69,7 +63,7 @@ router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
 
   for (let i = 0; i < observationsRows.length; i++) {
     const o = observationsRows[i];
-    const raw = o.raw_data ? JSON.parse(o.raw_data) : {};
+    const raw = o.raw_data ? (typeof o.raw_data === 'string' ? JSON.parse(o.raw_data) : o.raw_data) : {};
     const dateObj = new Date(o.timestamp);
     const hourBucket = `${String(dateObj.getUTCHours()).padStart(2, '0')}:00-${String((dateObj.getUTCHours() + 1) % 24).padStart(2, '0')}:00`;
     timeDist[hourBucket] = (timeDist[hourBucket] || 0) + 1;
@@ -134,8 +128,8 @@ router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
 
   const linkedEntities = Array.from(linkedEntityIds).map(id => entityMap.get(id) || { id, name: id, type: 'Entity' });
 
-  // Compute Co-Locations with other subjects
-  const otherObs = await db.query(`SELECT * FROM observations WHERE case_id = $1 AND entity_id != $2`, [targetCaseId, entityId]);
+  // Compute Co-Locations with other subjects via Ontology Core
+  const otherObs = await ontologyEngine.getObservations({ caseId: targetCaseId, excludeEntityId: entityId }, req.user);
   const coLocations = [];
 
   for (const obs of observationsRows) {
@@ -178,3 +172,4 @@ router.get('/:id', authenticateMiddleware, abacMiddleware('READ', async req => {
 });
 
 module.exports = router;
+

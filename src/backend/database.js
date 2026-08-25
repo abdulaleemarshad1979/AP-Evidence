@@ -101,7 +101,12 @@ class PostgreSQLDatabase {
         `CREATE TABLE IF NOT EXISTS workbook_boards (id VARCHAR(64) PRIMARY KEY, title VARCHAR(256) NOT NULL, description TEXT, case_id VARCHAR(64) NOT NULL, query_config TEXT NOT NULL, owner_id VARCHAR(64) NOT NULL, owner_name VARCHAR(128) NOT NULL, is_shared BOOLEAN DEFAULT TRUE, execution_count INT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
         `CREATE TABLE IF NOT EXISTS workshop_dashboards (id VARCHAR(64) PRIMARY KEY, title VARCHAR(256) NOT NULL, description TEXT, case_id VARCHAR(64) NOT NULL, layout_config TEXT NOT NULL, owner_id VARCHAR(64) NOT NULL, owner_name VARCHAR(128) NOT NULL, allowed_roles VARCHAR(256) DEFAULT 'Lead Investigator,Field Analyst', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
         `CREATE TABLE IF NOT EXISTS lineage_nodes (id VARCHAR(64) PRIMARY KEY, name VARCHAR(256) NOT NULL, node_type VARCHAR(64) NOT NULL, source_ref VARCHAR(256) NOT NULL, metadata TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
-        `CREATE TABLE IF NOT EXISTS lineage_edges (id VARCHAR(64) PRIMARY KEY, source_node_id VARCHAR(64) NOT NULL, target_node_id VARCHAR(64) NOT NULL, transform_type VARCHAR(64) NOT NULL, confidence_score DOUBLE PRECISION DEFAULT 1.0, metadata TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
+        `CREATE TABLE IF NOT EXISTS lineage_edges (id VARCHAR(64) PRIMARY KEY, source_node_id VARCHAR(64) NOT NULL, target_node_id VARCHAR(64) NOT NULL, transform_type VARCHAR(64) NOT NULL, confidence_score DOUBLE PRECISION DEFAULT 1.0, metadata TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
+        `CREATE TABLE IF NOT EXISTS quiver_canvases (id VARCHAR(64) PRIMARY KEY, case_id VARCHAR(64) NOT NULL, title VARCHAR(256) NOT NULL, description TEXT, canvas_data TEXT NOT NULL, mode VARCHAR(32) DEFAULT 'CANVAS', owner_id VARCHAR(64) NOT NULL, owner_name VARCHAR(128) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
+        `CREATE TABLE IF NOT EXISTS dossiers (id VARCHAR(64) PRIMARY KEY, case_id VARCHAR(64) NOT NULL, title VARCHAR(256) NOT NULL, summary TEXT, sections_json TEXT NOT NULL, linked_object_refs TEXT NOT NULL, author_id VARCHAR(64) NOT NULL, author_name VARCHAR(128) NOT NULL, status VARCHAR(32) DEFAULT 'DRAFT', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
+        `CREATE TABLE IF NOT EXISTS automations (id VARCHAR(64) PRIMARY KEY, name VARCHAR(256) NOT NULL, description TEXT, condition_definition TEXT NOT NULL, proposed_action_type VARCHAR(128) NOT NULL, review_required BOOLEAN DEFAULT TRUE, enabled BOOLEAN DEFAULT TRUE, version INT DEFAULT 1, created_by VARCHAR(128) NOT NULL DEFAULT 'System', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
+        `CREATE TABLE IF NOT EXISTS apollo_environments (id VARCHAR(64) PRIMARY KEY, name VARCHAR(128) NOT NULL, environment_type VARCHAR(32) NOT NULL DEFAULT 'PROD', config_json TEXT NOT NULL, target_version VARCHAR(32) NOT NULL DEFAULT '2.0.0', current_version VARCHAR(32) NOT NULL DEFAULT '2.0.0', health_status VARCHAR(32) NOT NULL DEFAULT 'HEALTHY', last_ping TIMESTAMP DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
+        `CREATE TABLE IF NOT EXISTS apollo_release_plans (id VARCHAR(64) PRIMARY KEY, environment_id VARCHAR(64) NOT NULL, from_version VARCHAR(32) NOT NULL, to_version VARCHAR(32) NOT NULL, status VARCHAR(32) NOT NULL DEFAULT 'DRAFT', approval_required BOOLEAN DEFAULT TRUE, approved_by VARCHAR(128), steps_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
       ];
 
       for (const sql of tables) {
@@ -109,7 +114,7 @@ class PostgreSQLDatabase {
       }
       console.log('[POSTGRES DB] Unit-test schema tables initialized');
     } else {
-      const migrationFiles = ['001_initial_schema.sql', '002_phase4_expansion.sql', '003_phase9_documents.sql', '004_phase10_ontology.sql', '005_ontology_core.sql', '006_lineage_engine.sql'];
+      const migrationFiles = ['001_initial_schema.sql', '002_phase4_expansion.sql', '003_phase9_documents.sql', '004_phase10_ontology.sql', '005_ontology_core.sql', '006_lineage_engine.sql', '007_phase13_workspace.sql', '008_phase14_automate.sql', '009_phase15_apollo.sql'];
       for (const file of migrationFiles) {
         const migrationPath = path.join(__dirname, 'migrations', file);
         if (fs.existsSync(migrationPath)) {
@@ -734,6 +739,240 @@ class PostgreSQLDatabase {
       `UPDATE ai_runs SET review_status = $1, reviewed_by = $2, reviewer_notes = $3 WHERE id = $4`,
       [reviewStatus, reviewer, notes, id]
     );
+  }
+
+  // --- Quiver Canvases Methods ---
+  async getQuiverCanvases(caseId = null) {
+    if (caseId) {
+      return await this.query(`SELECT * FROM quiver_canvases WHERE case_id = $1 ORDER BY updated_at DESC`, [caseId]);
+    }
+    return await this.query(`SELECT * FROM quiver_canvases ORDER BY updated_at DESC`);
+  }
+
+  async getQuiverCanvasById(id) {
+    return await this.queryOne(`SELECT * FROM quiver_canvases WHERE id = $1`, [id]);
+  }
+
+  async saveQuiverCanvas(canvas) {
+    const id = canvas.id || `QUIVER-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const existing = await this.getQuiverCanvasById(id);
+    const canvasDataStr = typeof canvas.canvasData === 'string' ? canvas.canvasData : JSON.stringify(canvas.canvasData || {});
+
+    if (existing) {
+      await this.execute(
+        `UPDATE quiver_canvases SET 
+           title = COALESCE($1, title),
+           description = COALESCE($2, description),
+           canvas_data = COALESCE($3, canvas_data),
+           mode = COALESCE($4, mode),
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = $5`,
+        [canvas.title || null, canvas.description || null, canvasDataStr, canvas.mode || 'CANVAS', id]
+      );
+    } else {
+      await this.execute(
+        `INSERT INTO quiver_canvases (id, case_id, title, description, canvas_data, mode, owner_id, owner_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          id,
+          canvas.caseId || 'CASE-AP-2026-0001',
+          canvas.title || 'Untitled Quiver Canvas',
+          canvas.description || '',
+          canvasDataStr,
+          canvas.mode || 'CANVAS',
+          canvas.ownerId || 'USR-101',
+          canvas.ownerName || 'Lead Analyst'
+        ]
+      );
+    }
+    return await this.getQuiverCanvasById(id);
+  }
+
+  // --- Dossiers Methods ---
+  async getDossiers(caseId = null) {
+    if (caseId) {
+      return await this.query(`SELECT * FROM dossiers WHERE case_id = $1 ORDER BY updated_at DESC`, [caseId]);
+    }
+    return await this.query(`SELECT * FROM dossiers ORDER BY updated_at DESC`);
+  }
+
+  async getDossierById(id) {
+    return await this.queryOne(`SELECT * FROM dossiers WHERE id = $1`, [id]);
+  }
+
+  async saveDossier(dossier) {
+    const id = dossier.id || `DOSSIER-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const existing = await this.getDossierById(id);
+    const sectionsStr = typeof dossier.sections === 'string' ? dossier.sections : JSON.stringify(dossier.sections || []);
+    const refsStr = typeof dossier.linkedObjectRefs === 'string' ? dossier.linkedObjectRefs : JSON.stringify(dossier.linkedObjectRefs || []);
+
+    if (existing) {
+      await this.execute(
+        `UPDATE dossiers SET 
+           title = COALESCE($1, title),
+           summary = COALESCE($2, summary),
+           sections_json = COALESCE($3, sections_json),
+           linked_object_refs = COALESCE($4, linked_object_refs),
+           status = COALESCE($5, status),
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = $6`,
+        [dossier.title || null, dossier.summary || null, sectionsStr, refsStr, dossier.status || 'DRAFT', id]
+      );
+    } else {
+      await this.execute(
+        `INSERT INTO dossiers (id, case_id, title, summary, sections_json, linked_object_refs, author_id, author_name, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          id,
+          dossier.caseId || 'CASE-AP-2026-0001',
+          dossier.title || 'Untitled Intelligence Dossier',
+          dossier.summary || '',
+          sectionsStr,
+          refsStr,
+          dossier.authorId || 'USR-101',
+          dossier.authorName || 'Lead Analyst',
+          dossier.status || 'DRAFT'
+        ]
+      );
+    }
+    return await this.getDossierById(id);
+  }
+
+  // --- Automate Engine Repository Methods ---
+  async getAutomations() {
+    return await this.query(`SELECT * FROM automations ORDER BY created_at DESC`);
+  }
+
+  async getAutomationById(id) {
+    return await this.queryOne(`SELECT * FROM automations WHERE id = $1`, [id]);
+  }
+
+  async saveAutomation(rule) {
+    const id = rule.id || `AUTO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const existing = await this.getAutomationById(id);
+    const condStr = typeof rule.conditionDefinition === 'string' ? rule.conditionDefinition : JSON.stringify(rule.conditionDefinition || {});
+
+    if (existing) {
+      await this.execute(
+        `UPDATE automations SET 
+           name = COALESCE($1, name),
+           description = COALESCE($2, description),
+           condition_definition = COALESCE($3, condition_definition),
+           proposed_action_type = COALESCE($4, proposed_action_type),
+           enabled = COALESCE($5, enabled),
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = $6`,
+        [rule.name || null, rule.description || null, condStr, rule.proposedActionType || null, rule.enabled ?? null, id]
+      );
+    } else {
+      await this.execute(
+        `INSERT INTO automations (id, name, description, condition_definition, proposed_action_type, review_required, enabled, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          id,
+          rule.name,
+          rule.description || '',
+          condStr,
+          rule.proposedActionType || 'FLAG_SUBJECT',
+          rule.reviewRequired !== false,
+          rule.enabled !== false,
+          rule.createdBy || 'System'
+        ]
+      );
+    }
+    return await this.getAutomationById(id);
+  }
+
+  async toggleAutomation(id, enabled) {
+    await this.execute(`UPDATE automations SET enabled = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, [enabled, id]);
+  }
+
+  // --- Apollo Release Orchestration Repository Methods ---
+  async getApolloEnvironments() {
+    return await this.query(`SELECT * FROM apollo_environments ORDER BY name ASC`);
+  }
+
+  async getApolloEnvironmentById(id) {
+    return await this.queryOne(`SELECT * FROM apollo_environments WHERE id = $1`, [id]);
+  }
+
+  async saveApolloEnvironment(env) {
+    const id = env.id || `ENV-${Date.now()}`;
+    const existing = await this.getApolloEnvironmentById(id);
+    const cfgStr = typeof env.configJson === 'string' ? env.configJson : JSON.stringify(env.configJson || {});
+
+    if (existing) {
+      await this.execute(
+        `UPDATE apollo_environments SET
+           name = COALESCE($1, name),
+           environment_type = COALESCE($2, environment_type),
+           config_json = COALESCE($3, config_json),
+           target_version = COALESCE($4, target_version),
+           current_version = COALESCE($5, current_version),
+           health_status = COALESCE($6, health_status),
+           last_ping = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = $7`,
+        [env.name || null, env.environmentType || null, cfgStr, env.targetVersion || null, env.currentVersion || null, env.healthStatus || null, id]
+      );
+    } else {
+      await this.execute(
+        `INSERT INTO apollo_environments (id, name, environment_type, config_json, target_version, current_version, health_status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          id,
+          env.name,
+          env.environmentType || 'PROD',
+          cfgStr,
+          env.targetVersion || '2.0.0',
+          env.currentVersion || '2.0.0',
+          env.healthStatus || 'HEALTHY'
+        ]
+      );
+    }
+    return await this.getApolloEnvironmentById(id);
+  }
+
+  async getApolloReleasePlans() {
+    return await this.query(`SELECT * FROM apollo_release_plans ORDER BY created_at DESC`);
+  }
+
+  async getApolloReleasePlanById(id) {
+    return await this.queryOne(`SELECT * FROM apollo_release_plans WHERE id = $1`, [id]);
+  }
+
+  async saveApolloReleasePlan(plan) {
+    const id = plan.id || `PLAN-${Date.now()}`;
+    const existing = await this.getApolloReleasePlanById(id);
+    const stepsStr = typeof plan.stepsJson === 'string' ? plan.stepsJson : JSON.stringify(plan.stepsJson || []);
+
+    if (existing) {
+      await this.execute(
+        `UPDATE apollo_release_plans SET
+           status = COALESCE($1, status),
+           approved_by = COALESCE($2, approved_by),
+           steps_json = COALESCE($3, steps_json),
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4`,
+        [plan.status || null, plan.approvedBy || null, stepsStr, id]
+      );
+    } else {
+      await this.execute(
+        `INSERT INTO apollo_release_plans (id, environment_id, from_version, to_version, status, approval_required, approved_by, steps_json)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          id,
+          plan.environmentId,
+          plan.fromVersion || '2.0.0',
+          plan.toVersion,
+          plan.status || 'DRAFT',
+          plan.approvalRequired !== false,
+          plan.approvedBy || null,
+          stepsStr
+        ]
+      );
+    }
+    return await this.getApolloReleasePlanById(id);
   }
 }
 

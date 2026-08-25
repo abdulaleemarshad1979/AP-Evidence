@@ -216,6 +216,10 @@ app.use('/api/lineage', require('./src/backend/modules/lineage'));
 app.use('/api/workbook', require('./src/backend/modules/workbook'));
 app.use('/api/workshop', require('./src/backend/modules/workshop'));
 app.use('/api/aip', require('./src/backend/modules/aip'));
+app.use('/api/quiver', require('./src/backend/modules/quiver'));
+app.use('/api/dossier', require('./src/backend/modules/dossier'));
+app.use('/api/automate', require('./src/backend/modules/automate'));
+app.use('/api/apollo', require('./src/backend/modules/apollo'));
 
 // Phase 4 & Phase 9 Ingestion Connectors Mount
 app.use('/api/v1/connectors/cctv', require('./src/backend/connectors/cctv_connector'));

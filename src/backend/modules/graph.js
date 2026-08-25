@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const ontologyEngine = require('../ontology/engine');
 const { authenticateMiddleware } = require('../middleware/auth');
 const { abacMiddleware } = require('../middleware/abac');
 
@@ -86,8 +87,12 @@ const handleGraphQuery = async (req, res) => {
   const userClearance = req.user?.clearanceLevel || 2;
   const hops = parseInt(maxHops || '2', 10);
 
-  let rawEntities = await db.getEntities({ search });
-  let assertionsRows = await db.query(`SELECT * FROM assertions WHERE case_id = $1`, [targetCaseId]);
+  // Fetch objects across ALL active Ontology Object Types via Ontology Core
+  const rawObjects = await ontologyEngine.getAllObjects({ search }, req.user);
+  let rawEntities = rawObjects.map(o => o.properties || o);
+
+  // Fetch assertions / relationships via Ontology Core
+  let assertionsRows = await ontologyEngine.getAssertions(targetCaseId, {}, req.user);
 
   if (centerId) {
     let activeSet = new Set([centerId]);
@@ -99,32 +104,36 @@ const handleGraphQuery = async (req, res) => {
       });
       activeSet = nextSet;
     }
-    rawEntities = rawEntities.filter(e => activeSet.has(e.id));
+    rawEntities = rawEntities.filter(e => activeSet.has(e.id || e.__primaryKey));
     assertionsRows = assertionsRows.filter(a => activeSet.has(a.subject_entity_id) && activeSet.has(a.object_entity_id));
   }
 
   // Construct dual Cytoscape and 2D Canvas compatible graph format with data masking
   const nodes = rawEntities.map(rawE => {
     const e = maskSubjectData(rawE, userClearance);
+    const id = e.id || e.__primaryKey;
+    const name = e.name || e.title || e.type_name || id;
+    const type = e.type || e.__type || 'Entity';
+
     return {
-      id: e.id,
-      label: e.name,
-      type: e.type,
-      evidenceStatus: e.evidenceStatus,
-      assertionClass: e.assertionClass,
-      humanReviewStatus: e.humanReviewStatus,
-      reviewPriority: e.reviewPriority,
-      isFictional: e.isFictional,
+      id,
+      label: name,
+      type,
+      evidenceStatus: e.evidenceStatus || e.evidence_status || 'VERIFIED_RAW',
+      assertionClass: e.assertionClass || e.assertion_class || 'CONFIRMED_FACT',
+      humanReviewStatus: e.humanReviewStatus || e.human_review_status || 'UNREVIEWED',
+      reviewPriority: e.reviewPriority || e.review_priority || 'P2_MEDIUM',
+      isFictional: Boolean(e.isFictional),
       isMasked: Boolean(e.isMasked),
       data: {
-        id: e.id,
-        label: e.name,
-        type: e.type,
-        evidenceStatus: e.evidenceStatus,
-        assertionClass: e.assertionClass,
-        humanReviewStatus: e.humanReviewStatus,
-        reviewPriority: e.reviewPriority,
-        isFictional: e.isFictional,
+        id,
+        label: name,
+        type,
+        evidenceStatus: e.evidenceStatus || e.evidence_status || 'VERIFIED_RAW',
+        assertionClass: e.assertionClass || e.assertion_class || 'CONFIRMED_FACT',
+        humanReviewStatus: e.humanReviewStatus || e.human_review_status || 'UNREVIEWED',
+        reviewPriority: e.reviewPriority || e.review_priority || 'P2_MEDIUM',
+        isFictional: Boolean(e.isFictional),
         isMasked: Boolean(e.isMasked)
       }
     };
@@ -171,7 +180,7 @@ router.get('/shortest-path', authenticateMiddleware, abacMiddleware('READ', asyn
     return res.status(400).json({ error: 'startId and endId are required' });
   }
 
-  const assertionsRows = await db.query(`SELECT * FROM assertions WHERE case_id = $1`, [targetCaseId]);
+  const assertionsRows = await ontologyEngine.getAssertions(targetCaseId, {}, req.user);
   const adj = {};
   assertionsRows.forEach(a => {
     if (!adj[a.subject_entity_id]) adj[a.subject_entity_id] = [];
@@ -206,3 +215,4 @@ router.get('/shortest-path', authenticateMiddleware, abacMiddleware('READ', asyn
 });
 
 module.exports = router;
+
